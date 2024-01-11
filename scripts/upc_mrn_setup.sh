@@ -109,6 +109,7 @@ main()
   add_line_bashrc "export _colcon_cd_root=/opt/ros/${ROSVERSION}/"
   add_line_bashrc "source /usr/share/colcon_argcomplete/hook/colcon-argcomplete.bash"
   add_line_bashrc "export ROS_LOCALHOST_ONLY=1"
+  add_line_bashrc "export ROS_DOMAIN_ID=0"
   
   source ~/.bashrc
 

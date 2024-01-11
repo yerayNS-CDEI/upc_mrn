@@ -9,21 +9,29 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(geometry_msgs REQUIRED)
 
+# Node prova
 add_executable(node_prova src/node_prova.cpp)
-target_include_directories(node_prova PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-  $<INSTALL_INTERFACE:include>)
-target_compile_features(node_prova PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
 ament_target_dependencies(node_prova rclcpp std_msgs)
 
-install(TARGETS node_prova
-  DESTINATION lib/${PROJECT_NAME})
+# PubTwist
+add_executable(pub_twist src/pub_twist.cpp)
+ament_target_dependencies(pub_twist rclcpp geometry_msgs)
 
-# Install launch, urdf, world, rviz folders.
+# Install nodes
+install(TARGETS
+        node_prova 
+        pub_twist
+        DESTINATION lib/${PROJECT_NAME})
+
+# Install folders: launch, urdf, world, rviz
 install(DIRECTORY
-  launch urdf rviz worlds
-  DESTINATION share/${PROJECT_NAME}/
+        launch
+        urdf
+        rviz
+        worlds
+        DESTINATION share/${PROJECT_NAME}/
 )
 
 if(BUILD_TESTING)
