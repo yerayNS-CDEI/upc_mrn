@@ -83,7 +83,6 @@ main()
     add_apt_rospkg turtlebot4-simulator 
     add_apt_rospkg turtlebot4-desktop 
     add_apt_rospkg turtlebot4-navigation 
-    add_apt_rospkg turtlebot4-setup 
     add_apt_rospkg turtlebot4-node 
     add_apt_rospkg turtlebot4-tutorials
     add_apt_rospkg teleop-twist-keyboard
@@ -126,7 +125,7 @@ main()
 function add_apt_pkg #ARGS: pkg
 {
   PKG=$1
-  echo " --- Installing apt-get package ${PKG}"
+  echo " --- Installing apt package ${PKG}"
   if [ $SUDO == "true" ]; then
     sudo apt-get install -y ${PKG} &>> ${REDIRECTION} || echo "###ERROR Installing apt-get package ${PKG}, for more info check log file: $LOGDIR/$FILENAME.log"
   else
