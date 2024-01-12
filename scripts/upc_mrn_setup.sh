@@ -80,12 +80,13 @@ main()
   echo " --- Installing extra ros packages"
   if [ $SUDOER == "true" ]; then
     add_apt_rospkg rplidar-ros 
+    add_apt_rospkg rqt-tf-tree
+    add_apt_rospkg teleop-twist-keyboard
     add_apt_rospkg turtlebot4-simulator 
     add_apt_rospkg turtlebot4-desktop 
     add_apt_rospkg turtlebot4-navigation 
     add_apt_rospkg turtlebot4-node 
     add_apt_rospkg turtlebot4-tutorials
-    add_apt_rospkg teleop-twist-keyboard
   fi
 
   if ! [ -d ~/${WSNAME}/src/upc_mrn ]; then

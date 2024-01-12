@@ -80,8 +80,6 @@ def generate_launch_description():
     # Paths
     turtlebot4_ros_ign_bridge_launch = PathJoinSubstitution(
         [pkg_upc_mrn, 'launch', 'ros_ign_bridge.launch.py'])
-    rviz_launch = PathJoinSubstitution(
-        [pkg_upc_mrn, 'launch', 'view_robot.launch.py'])
     turtlebot4_node_launch = PathJoinSubstitution(
         [pkg_turtlebot4_ignition_bringup, 'launch', 'turtlebot4_nodes.launch.py'])
     create3_nodes_launch = PathJoinSubstitution(
@@ -274,15 +272,6 @@ def generate_launch_description():
         condition=IfCondition(LaunchConfiguration('nav2'))
     )
 
-    # RViz
-    rviz = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource([rviz_launch]),
-        launch_arguments=[
-            ('namespace', namespace),
-            ('use_sim_time', use_sim_time)],
-        condition=IfCondition(LaunchConfiguration('rviz')),
-    )
-
     # Define LaunchDescription variable
     ld = LaunchDescription(ARGUMENTS)
     ld.add_action(param_file_cmd)
@@ -290,5 +279,4 @@ def generate_launch_description():
     ld.add_action(localization)
     ld.add_action(slam)
     ld.add_action(nav2)
-    ld.add_action(rviz)
     return ld

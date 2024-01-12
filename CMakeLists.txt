@@ -10,19 +10,23 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
-
-# Node prova
-add_executable(node_prova src/node_prova.cpp)
-ament_target_dependencies(node_prova rclcpp std_msgs)
+find_package(nav_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(tf2 REQUIRED)
+find_package(tf2_geometry_msgs REQUIRED)
 
 # PubTwist
 add_executable(pub_twist src/pub_twist.cpp)
 ament_target_dependencies(pub_twist rclcpp geometry_msgs)
 
+# OdomNew
+add_executable(odom_new src/odom_new.cpp)
+ament_target_dependencies(odom_new rclcpp tf2 tf2_geometry_msgs nav_msgs sensor_msgs)
+
 # Install nodes
 install(TARGETS
-        node_prova 
         pub_twist
+        odom_new
         DESTINATION lib/${PROJECT_NAME})
 
 # Install folders: launch, urdf, world, rviz
