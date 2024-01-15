@@ -136,6 +136,7 @@ void FindFrontiers::mapCallback(const nav_msgs::msg::OccupancyGrid &msg)
     std::vector<int> labels = twoPassLabeling(map_frontiers, labels_sizes);
 
     // Create and fill frontiers message
+    std::vector<int> frontiers_labels;
     upc_mrn::msg::Frontiers frontiers_msg;
     frontiers_msg.header = msg.header;
     frontiers_msg.frontiers.clear();
@@ -149,10 +150,10 @@ void FindFrontiers::mapCallback(const nav_msgs::msg::OccupancyGrid &msg)
 
             // search existing frontier
             bool new_label = true;
-            for (unsigned int j = 0; j < frontiers_msg.frontiers.size(); j++)
+            for (auto j = 0; j < frontiers_msg.frontiers.size(); j++)
             {
                 // found
-                if (frontiers_msg.frontiers[j].id == labels[i])
+                if (frontiers_labels[j] == labels[i])
                 {
                     frontiers_msg.frontiers[j].cells.push_back(i);
                     frontiers_msg.frontiers[j].cells_points.push_back(cell2point(i, map_frontiers));
@@ -164,11 +165,11 @@ void FindFrontiers::mapCallback(const nav_msgs::msg::OccupancyGrid &msg)
             if (new_label)
             {
                 upc_mrn::msg::Frontier new_frontier;
-                new_frontier.id = labels[i];
                 new_frontier.size = labels_sizes[labels[i]];
                 new_frontier.cells.push_back(i);
                 new_frontier.cells_points.push_back(cell2point(i, map_frontiers));
                 frontiers_msg.frontiers.push_back(new_frontier);
+                frontier_labels.push_back(labels[i]);
             }
         }
     }
@@ -176,7 +177,7 @@ void FindFrontiers::mapCallback(const nav_msgs::msg::OccupancyGrid &msg)
     // Compute center cell
     for (auto i = 0; i < frontiers_msg.frontiers.size(); ++i)
     {
-        int label = frontiers_msg.frontiers[i].id;
+        int label = frontier_labels[i];
 
         // order the frontier cells
         std::deque<int> ordered_cells(0);
@@ -297,19 +298,19 @@ std::vector<int> FindFrontiers::twoPassLabeling(const nav_msgs::msg::OccupancyGr
 void FindFrontiers::publishMarkers(const upc_mrn::msg::Frontiers &frontiers_msg)
 {
     // resize
-    markers_.markers.resize(frontiers_msg.frontiers.size() * 3 + 1); // each frontier: cells_points, center_free_point i id
+    markers_.markers.resize(frontiers_msg.frontiers.size() * 3 + 1); // each frontier: cells_points, center_point i text
 
     // deleteall
     markers_.markers[0].action = visualization_msgs::msg::Marker::DELETEALL;
 
     // omplir
-    for (int i = 0; i < frontiers_msg.frontiers.size(); i++)
+    for (auto i = 0; i < frontiers_msg.frontiers.size(); i++)
     {
         std_msgs::msg::ColorRGBA c;
         c.a = 1.0;
-        c.r = sin(frontiers_msg.frontiers[i].id * 0.3);
-        c.g = sin(frontiers_msg.frontiers[i].id * 0.3 + 2 * M_PI / 3);
-        c.b = sin(frontiers_msg.frontiers[i].id * 0.3 + 4 * M_PI / 3);
+        c.r = sin(i * 0.3);
+        c.g = sin(i * 0.3 + 2 * M_PI / 3);
+        c.b = sin(i * 0.3 + 4 * M_PI / 3);
 
         // points
         visualization_msgs::msg::Marker marker_points;
@@ -344,7 +345,7 @@ void FindFrontiers::publishMarkers(const upc_mrn::msg::Frontiers &frontiers_msg)
         marker_center.pose.orientation.w = 1;
         markers_.markers[3 * i + 2] = marker_center;
 
-        // id text
+        // text
         visualization_msgs::msg::Marker marker_id;
         marker_id.header.frame_id = frontiers_msg.header.frame_id;
         marker_id.header.stamp = this->now();
@@ -352,7 +353,7 @@ void FindFrontiers::publishMarkers(const upc_mrn::msg::Frontiers &frontiers_msg)
         marker_id.type = visualization_msgs::msg::Marker::TEXT_VIEW_FACING;
         marker_id.scale.x = marker_id.scale.y = 1;
         marker_id.scale.z = 0.5;
-        marker_id.text = std::to_string(frontiers_msg.frontiers[i].id);
+        marker_id.text = std::to_string(i);
         marker_id.color = c;
         marker_id.pose = marker_center.pose;
         marker_id.pose.position.z = marker_center.scale.z + 0.2;
