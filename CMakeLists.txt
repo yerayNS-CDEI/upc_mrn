@@ -28,11 +28,16 @@ ament_target_dependencies(odom_new rclcpp tf2 tf2_geometry_msgs nav_msgs sensor_
 add_executable(laser_processor src/laser_processor.cpp)
 ament_target_dependencies(laser_processor rclcpp tf2 tf2_geometry_msgs visualization_msgs nav_msgs sensor_msgs)
 
+# SafetyNode
+add_executable(safety_node src/safety_node.cpp)
+ament_target_dependencies(safety_node rclcpp geometry_msgs sensor_msgs)
+
 # Install nodes
 install(TARGETS
         pub_twist
         odom_new
         laser_processor
+        safety_node
         DESTINATION lib/${PROJECT_NAME})
 
 # Install folders: launch, urdf, world, rviz

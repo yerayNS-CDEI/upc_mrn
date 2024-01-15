@@ -8,7 +8,7 @@
 #include "sensor_msgs/msg/laser_scan.hpp"
 #include "visualization_msgs/msg/marker.hpp"
 #include "std_msgs/msg/color_rgba.hpp"
-#include "tf2/utils.h" // getYaw
+#include "tf2/utils.h"                             // getYaw
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp" // toMsg
 
 class LaserProcessor : public rclcpp::Node
@@ -24,7 +24,9 @@ class LaserProcessor : public rclcpp::Node
     double pose_x_, pose_y_, pose_yaw_;
     double sensor_x_, sensor_y_, sensor_z_, sensor_yaw_;
 
+    // ----- Methods -----
 public:
+    // Constructor
     LaserProcessor()
         : Node("laser_processor")
     {
@@ -59,6 +61,7 @@ public:
         // TODO 2a END
     }
 
+    // Callback of laser scan
     void laser_callback(const sensor_msgs::msg::LaserScan &laser_msg)
     {
         int size = laser_msg.ranges.size();
@@ -153,6 +156,7 @@ public:
         RCLCPP_INFO(this->get_logger(), "---");
     }
 
+    // Publisher of visualization markers for debugging purposes
     void publish_marker(const std::vector<double> &x,
                         const std::vector<double> &y,
                         const int &subsampling,
@@ -198,6 +202,7 @@ public:
         points_pub_->publish(marker);
     }
 
+    // Callback of odometry
     void odom_callback(const nav_msgs::msg::Odometry &odom_msg)
     {
         pose_x_ = odom_msg.pose.pose.position.x;
@@ -208,8 +213,8 @@ public:
 
 int main(int argc, char **argv)
 {
-  rclcpp::init(argc, argv);
-  rclcpp::spin(std::make_shared<LaserProcessor>());
-  rclcpp::shutdown();
-  return 0;
+    rclcpp::init(argc, argv);
+    rclcpp::spin(std::make_shared<LaserProcessor>());
+    rclcpp::shutdown();
+    return 0;
 }
