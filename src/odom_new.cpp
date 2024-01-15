@@ -22,8 +22,8 @@ class OdomNew : public rclcpp::Node
   double x_, y_, th_;
   double radius_, wheel_distance_;
 
-  // ----- Methods -----
 public:
+  // ----- Methods -----
   // Constructor
   OdomNew()
       : Node("odom_new")

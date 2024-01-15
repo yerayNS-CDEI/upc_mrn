@@ -8,6 +8,7 @@ endif()
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(rosidl_default_generators REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
@@ -15,6 +16,17 @@ find_package(sensor_msgs REQUIRED)
 find_package(visualization_msgs REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
+
+# Own messages
+set(msg_files
+    "msg/Frontier.msg"
+    "msg/Frontiers.msg"
+)
+rosidl_generate_interfaces(${PROJECT_NAME}
+                           ${msg_files}
+                           DEPENDENCIES builtin_interfaces geometry_msgs std_msgs
+)
+ament_export_dependencies(rosidl_default_runtime)
 
 # PubTwist
 add_executable(pub_twist src/pub_twist.cpp)
@@ -32,17 +44,27 @@ ament_target_dependencies(laser_processor rclcpp tf2 tf2_geometry_msgs visualiza
 add_executable(safety_node src/safety_node.cpp)
 ament_target_dependencies(safety_node rclcpp geometry_msgs sensor_msgs)
 
+# FindFrontiers
+add_executable(find_frontiers src/find_frontiers.cpp)
+ament_target_dependencies(find_frontiers rclcpp geometry_msgs nav_msgs visualization_msgs)
+rosidl_target_interfaces(find_frontiers
+                         ${PROJECT_NAME} "rosidl_typesupport_cpp")
+
+
+
 # Install nodes
 install(TARGETS
         pub_twist
         odom_new
         laser_processor
         safety_node
+        find_frontiers
         DESTINATION lib/${PROJECT_NAME})
 
 # Install folders: launch, urdf, world, rviz
 install(DIRECTORY
         launch
+        config
         urdf
         rviz
         worlds
