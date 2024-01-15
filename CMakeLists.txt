@@ -12,6 +12,7 @@ find_package(std_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(visualization_msgs REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 
@@ -23,10 +24,15 @@ ament_target_dependencies(pub_twist rclcpp geometry_msgs)
 add_executable(odom_new src/odom_new.cpp)
 ament_target_dependencies(odom_new rclcpp tf2 tf2_geometry_msgs nav_msgs sensor_msgs)
 
+# LaserProcessor
+add_executable(laser_processor src/laser_processor.cpp)
+ament_target_dependencies(laser_processor rclcpp tf2 tf2_geometry_msgs visualization_msgs nav_msgs sensor_msgs)
+
 # Install nodes
 install(TARGETS
         pub_twist
         odom_new
+        laser_processor
         DESTINATION lib/${PROJECT_NAME})
 
 # Install folders: launch, urdf, world, rviz

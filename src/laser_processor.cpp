@@ -1,40 +1,54 @@
-#include "ros/ros.h"
-#include "nav_msgs/Odometry.h"
-#include "sensor_msgs/LaserScan.h"
-#include "visualization_msgs/MarkerArray.h"
-#include "visualization_msgs/Marker.h"
-#include "std_msgs/ColorRGBA.h"
-#include <tf/transform_datatypes.h>
+#include <chrono>
+#include <functional>
+#include <memory>
+#include <string>
 
-class LaserProcessor
+#include "rclcpp/rclcpp.hpp"
+#include "nav_msgs/msg/odometry.hpp"
+#include "sensor_msgs/msg/laser_scan.hpp"
+#include "visualization_msgs/msg/marker.hpp"
+#include "std_msgs/msg/color_rgba.hpp"
+#include "tf2/utils.h" // getYaw
+#include "tf2_geometry_msgs/tf2_geometry_msgs.hpp" // toMsg
+
+class LaserProcessor : public rclcpp::Node
 {
-    ros::Subscriber     laser_sub;
-    ros::Subscriber     odom_sub;
-    ros::Publisher      points_pub;
-    std_msgs::ColorRGBA red;
-    std_msgs::ColorRGBA green;
-    std_msgs::ColorRGBA blue;
-    double              pose_x_, pose_y_, pose_yaw_;
-    double              sensor_x_, sensor_y_, sensor_z_, sensor_yaw_;
+    // ----- Attributes -----
+    rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr laser_sub_;
+    rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
+    rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr points_pub_;
 
-  public:
+    std_msgs::msg::ColorRGBA red;
+    std_msgs::msg::ColorRGBA green;
+    std_msgs::msg::ColorRGBA blue;
+    double pose_x_, pose_y_, pose_yaw_;
+    double sensor_x_, sensor_y_, sensor_z_, sensor_yaw_;
+
+public:
     LaserProcessor()
+        : Node("laser_processor")
     {
-        laser_sub  = n.subscribe("scan", 1, &LaserProcessor::laser_callback, this);
-        odom_sub   = n.subscribe("odom", 1, &LaserProcessor::odom_callback, this);
-        points_pub = n.advertise<visualization_msgs::Marker>("points", 1);
-
-        red.r   = 1.0;
-        red.a   = 0.5;
+        // initialization
+        red.r = 1.0;
+        red.a = 0.5;
         green.g = 1.0;
         green.a = 0.5;
-        blue.b  = 1.0;
-        blue.a  = 0.5;
+        blue.b = 1.0;
+        blue.a = 0.5;
 
         // transform from odom to platform (automatically updated on odom_callback)
-        pose_x_   = 0.0;
-        pose_y_   = 0.0;
+        pose_x_ = 0.0;
+        pose_y_ = 0.0;
         pose_yaw_ = 0.0;
+
+        // subscribers
+        laser_sub_ = this->create_subscription<sensor_msgs::msg::LaserScan>(
+            "scan", 10, std::bind(&LaserProcessor::laser_callback, this, std::placeholders::_1));
+        odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
+            "odom", 10, std::bind(&LaserProcessor::odom_callback, this, std::placeholders::_1));
+
+        // publisher
+        points_pub_ = this->create_publisher<visualization_msgs::msg::Marker>("points", 1);
 
         // transform from platform to sensor
         // TODO 2a START
@@ -45,37 +59,37 @@ class LaserProcessor
         // TODO 2a END
     }
 
-    void laser_callback(const sensor_msgs::LaserScan::ConstPtr& laser_msg)
+    void laser_callback(const sensor_msgs::msg::LaserScan &laser_msg)
     {
-        int size = laser_msg->ranges.size();
-        ROS_INFO("Received scan ranges size=%d", size);
+        int size = laser_msg.ranges.size();
+        RCLCPP_INFO(this->get_logger(), "Received scan ranges size=%d", size);
         std::vector<double> x(size, 0.0);
         std::vector<double> y(size, 0.0);
 
         // print & visualize one of each n points
-        int n_viz   = 10;        // <-- CHANGE IT TO DISPLAY MORE OR LESS POINTS
-        int n_print = size / 4;  // <-- CHANGE IT TO DISPLAY MORE OR LESS POINTS
+        int n_viz = 10;         // <-- CHANGE IT TO DISPLAY MORE OR LESS POINTS
+        int n_print = size / 4; // <-- CHANGE IT TO DISPLAY MORE OR LESS POINTS
 
         // ======= C++ TIPS: Some examples of using std::vector =======
 
         // //Resize a vector
         // std::vector<int> v;
         // int my_size=2;
-        // ROS_INFO("v.size()=%lu", v.size());
+        // RCLCPP_INFO(this->get_logger(), "v.size()=%lu", v.size());
         // v.resize(my_size);
-        // ROS_INFO("v.size()=%lu", v.size());
-        // ROS_INFO("--");
+        // RCLCPP_INFO(this->get_logger(), "v.size()=%lu", v.size());
+        // RCLCPP_INFO(this->get_logger(), "--");
 
         // //Add an element at the end
         // std::vector<double> vv;
         // double my_number=1.23;
         // double other_number=4.56;
-        // ROS_INFO("vv.size()=%lu", vv.size());
+        // RCLCPP_INFO(this->get_logger(), "vv.size()=%lu", vv.size());
         // vv.push_back(my_number);
-        // ROS_INFO("vv.size()=%lu", vv.size());
+        // RCLCPP_INFO(this->get_logger(), "vv.size()=%lu", vv.size());
         // vv.push_back(other_number);
-        // ROS_INFO("vv.size()=%lu", vv.size());
-        // ROS_INFO("--");
+        // RCLCPP_INFO(this->get_logger(), "vv.size()=%lu", vv.size());
+        // RCLCPP_INFO(this->get_logger(), "--");
 
         // //Init vector with size and value
         // int other_size=3;
@@ -84,10 +98,9 @@ class LaserProcessor
         // //Loop through a vector
         // for(unsigned int i=0; i<vvv.size(); i++)
         // {
-        //  ROS_INFO("vvv[%d]=%f",i, vvv[i]);
+        //   RCLCPP_INFO(this->get_logger(), "vvv[%d]=%f",i, vvv[i]);
         // }
-        // ROS_INFO("--");
-
+        // RCLCPP_INFO(this->get_logger(), "--");
 
         // ======== TRANSFORMATION 1 ========
         // scan from polar to cartesian (sensor coordinates)
@@ -99,10 +112,11 @@ class LaserProcessor
         // TODO 1 END
 
         // OUTPUT1
-        ROS_INFO("Cartesian (scan frame):");
-        for (unsigned int i = 0; i < x.size(); i += n_print) ROS_INFO("for index=%d, x,y=%f,%f", i, x[i], y[i]);
+        RCLCPP_INFO(this->get_logger(), "Cartesian (scan frame):");
+        for (unsigned int i = 0; i < x.size(); i += n_print)
+            RCLCPP_INFO(this->get_logger(), "for index=%d, x,y=%f,%f", i, x[i], y[i]);
 
-        publish_marker(x, y, n_viz, "base_scan", "cartesian", 1, 0.0, red, laser_msg->header.stamp);
+        publish_marker(x, y, n_viz, "base_scan", "cartesian", 1, 0.0, red, laser_msg.header.stamp);
 
         // ======== TRANSFORMATION 2 ========
         // scan points in base_link coordinates
@@ -114,10 +128,11 @@ class LaserProcessor
         // TODO 2b END
 
         // OUTPUT2
-        ROS_INFO("World frame:");
-        for (unsigned int i = 0; i < x.size(); i += n_print) ROS_INFO("for index=%d, x,y=%f,%f", i, x[i], y[i]);
+        RCLCPP_INFO(this->get_logger(), "World frame:");
+        for (unsigned int i = 0; i < x.size(); i += n_print)
+            RCLCPP_INFO(this->get_logger(), "for index=%d, x,y=%f,%f", i, x[i], y[i]);
 
-        publish_marker(x, y, n_viz, "base_link", "platform", 2, sensor_z_, blue, laser_msg->header.stamp);
+        publish_marker(x, y, n_viz, "base_link", "platform", 2, sensor_z_, blue, laser_msg.header.stamp);
 
         // ======== TRANSFORMATION 3 ========
         // scan points in odom coordinates
@@ -129,45 +144,46 @@ class LaserProcessor
         // TODO 3 END
 
         // OUTPUT2
-        ROS_INFO("World frame:");
-        for (unsigned int i = 0; i < x.size(); i += n_print) ROS_INFO("for index=%d, x,y=%f,%f", i, x[i], y[i]);
+        RCLCPP_INFO(this->get_logger(), "World frame:");
+        for (unsigned int i = 0; i < x.size(); i += n_print)
+            RCLCPP_INFO(this->get_logger(), "for index=%d, x,y=%f,%f", i, x[i], y[i]);
 
-        publish_marker(x, y, n_viz, "odom", "world", 2, sensor_z_, green, laser_msg->header.stamp);
+        publish_marker(x, y, n_viz, "odom", "world", 2, sensor_z_, green, laser_msg.header.stamp);
 
-        ROS_INFO("---");
+        RCLCPP_INFO(this->get_logger(), "---");
     }
 
-    void publish_marker(const std::vector<double>& x,
-                        const std::vector<double>& y,
-                        const int&                 subsampling,
-                        const std::string&         frame_id,
-                        const std::string&         ns,
-                        const int&                 id,
-                        const double&              z,
-                        const std_msgs::ColorRGBA& color,
-                        const ros::Time&           t)
+    void publish_marker(const std::vector<double> &x,
+                        const std::vector<double> &y,
+                        const int &subsampling,
+                        const std::string &frame_id,
+                        const std::string &ns,
+                        const int &id,
+                        const double &z,
+                        const std_msgs::msg::ColorRGBA &color,
+                        const rclcpp::Time &t)
     {
-        visualization_msgs::Marker marker;
-        marker.header.frame_id    = frame_id;
-        marker.header.stamp       = t;
-        marker.ns                 = ns;
-        marker.id                 = id;
-        marker.type               = visualization_msgs::Marker::POINTS;
-        marker.action             = visualization_msgs::Marker::ADD;
-        marker.pose.position.x    = 0;
-        marker.pose.position.y    = 0;
-        marker.pose.position.z    = 0;
+        visualization_msgs::msg::Marker marker;
+        marker.header.frame_id = frame_id;
+        marker.header.stamp = t;
+        marker.ns = ns;
+        marker.id = id;
+        marker.type = visualization_msgs::msg::Marker::POINTS;
+        marker.action = visualization_msgs::msg::Marker::ADD;
+        marker.pose.position.x = 0;
+        marker.pose.position.y = 0;
+        marker.pose.position.z = 0;
         marker.pose.orientation.x = 0.0;
         marker.pose.orientation.y = 0.0;
         marker.pose.orientation.z = 0.0;
         marker.pose.orientation.w = 1.0;
-        marker.scale.x            = 0.01;
-        marker.scale.y            = 0.01;
-        marker.scale.z            = 0.01;
-        marker.color              = color;
-        marker.lifetime           = ros::Duration(0.0f);
+        marker.scale.x = 0.01;
+        marker.scale.y = 0.01;
+        marker.scale.z = 0.01;
+        marker.color = color;
+        marker.lifetime = rclcpp::Duration(0, 0);
 
-        geometry_msgs::Point point;
+        geometry_msgs::msg::Point point;
         for (unsigned int i = 0; i < x.size(); i += subsampling)
         {
             if (x[i] == x[i] and y[i] == y[i] and abs(x[i]) < 1e3 and abs(y[i]) < 1e3)
@@ -178,27 +194,22 @@ class LaserProcessor
                 marker.points.push_back(point);
             }
         }
-        ROS_INFO("Publishing points of %s: %lu", ns.c_str(), marker.points.size());
-        points_pub.publish(marker);
+        RCLCPP_INFO(this->get_logger(), "Publishing points of %s: %lu", ns.c_str(), marker.points.size());
+        points_pub_->publish(marker);
     }
 
-    void odom_callback(const nav_msgs::Odometry::ConstPtr& odom_msg)
+    void odom_callback(const nav_msgs::msg::Odometry &odom_msg)
     {
-        pose_x_   = odom_msg->pose.pose.position.x;
-        pose_y_   = odom_msg->pose.pose.position.y;
-        pose_yaw_ = tf::getYaw(odom_msg->pose.pose.orientation);
+        pose_x_ = odom_msg.pose.pose.position.x;
+        pose_y_ = odom_msg.pose.pose.position.y;
+        pose_yaw_ = tf2::getYaw(odom_msg.pose.pose.orientation);
     }
 };
 
-int main(int argc, char** argv)
+int main(int argc, char **argv)
 {
-    ros::init(argc, argv, "laser_processor");
-    LaserProcessor my_laser_processor;
-    ros::Rate      loop_rate(10);
-    while (ros::ok())
-    {
-        ros::spinOnce();
-        loop_rate.sleep();
-    }
-    return 0;
+  rclcpp::init(argc, argv);
+  rclcpp::spin(std::make_shared<LaserProcessor>());
+  rclcpp::shutdown();
+  return 0;
 }
