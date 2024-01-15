@@ -22,12 +22,12 @@ public:
     {
         publisher_ = this->create_publisher<geometry_msgs::msg::Twist>("cmd_vel", 10);
         timer_ = this->create_wall_timer(
-            500ms, std::bind(&PubTwist::publish_twist_periodically, this));
+            500ms, std::bind(&PubTwist::publishTwistPeriodically, this));
     }
 
 private:
     // Method that publish a twist message (called periodically by timer_)
-    void publish_twist_periodically()
+    void publishTwistPeriodically()
     {
         auto twist_msg = geometry_msgs::msg::Twist();
         twist_msg.linear.x = 0.25;

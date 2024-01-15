@@ -38,16 +38,16 @@ public:
         blue.b = 1.0;
         blue.a = 0.5;
 
-        // transform from odom to platform (automatically updated on odom_callback)
+        // transform from odom to platform (automatically updated on odomCallback)
         pose_x_ = 0.0;
         pose_y_ = 0.0;
         pose_yaw_ = 0.0;
 
         // subscribers
         laser_sub_ = this->create_subscription<sensor_msgs::msg::LaserScan>(
-            "scan", 10, std::bind(&LaserProcessor::laser_callback, this, std::placeholders::_1));
+            "scan", 10, std::bind(&LaserProcessor::laserCallback, this, std::placeholders::_1));
         odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
-            "odom", 10, std::bind(&LaserProcessor::odom_callback, this, std::placeholders::_1));
+            "odom", 10, std::bind(&LaserProcessor::odomCallback, this, std::placeholders::_1));
 
         // publisher
         points_pub_ = this->create_publisher<visualization_msgs::msg::Marker>("points", 1);
@@ -62,7 +62,7 @@ public:
     }
 
     // Callback of laser scan
-    void laser_callback(const sensor_msgs::msg::LaserScan &laser_msg)
+    void laserCallback(const sensor_msgs::msg::LaserScan &laser_msg)
     {
         int size = laser_msg.ranges.size();
         RCLCPP_INFO(this->get_logger(), "Received scan ranges size=%d", size);
@@ -119,7 +119,7 @@ public:
         for (unsigned int i = 0; i < x.size(); i += n_print)
             RCLCPP_INFO(this->get_logger(), "for index=%d, x,y=%f,%f", i, x[i], y[i]);
 
-        publish_marker(x, y, n_viz, "base_scan", "cartesian", 1, 0.0, red, laser_msg.header.stamp);
+        publishMarker(x, y, n_viz, "base_scan", "cartesian", 1, 0.0, red, laser_msg.header.stamp);
 
         // ======== TRANSFORMATION 2 ========
         // scan points in base_link coordinates
@@ -135,7 +135,7 @@ public:
         for (unsigned int i = 0; i < x.size(); i += n_print)
             RCLCPP_INFO(this->get_logger(), "for index=%d, x,y=%f,%f", i, x[i], y[i]);
 
-        publish_marker(x, y, n_viz, "base_link", "platform", 2, sensor_z_, blue, laser_msg.header.stamp);
+        publishMarker(x, y, n_viz, "base_link", "platform", 2, sensor_z_, blue, laser_msg.header.stamp);
 
         // ======== TRANSFORMATION 3 ========
         // scan points in odom coordinates
@@ -151,13 +151,13 @@ public:
         for (unsigned int i = 0; i < x.size(); i += n_print)
             RCLCPP_INFO(this->get_logger(), "for index=%d, x,y=%f,%f", i, x[i], y[i]);
 
-        publish_marker(x, y, n_viz, "odom", "world", 2, sensor_z_, green, laser_msg.header.stamp);
+        publishMarker(x, y, n_viz, "odom", "world", 2, sensor_z_, green, laser_msg.header.stamp);
 
         RCLCPP_INFO(this->get_logger(), "---");
     }
 
     // Publisher of visualization markers for debugging purposes
-    void publish_marker(const std::vector<double> &x,
+    void publishMarker(const std::vector<double> &x,
                         const std::vector<double> &y,
                         const int &subsampling,
                         const std::string &frame_id,
@@ -203,7 +203,7 @@ public:
     }
 
     // Callback of odometry
-    void odom_callback(const nav_msgs::msg::Odometry &odom_msg)
+    void odomCallback(const nav_msgs::msg::Odometry &odom_msg)
     {
         pose_x_ = odom_msg.pose.pose.position.x;
         pose_y_ = odom_msg.pose.pose.position.y;

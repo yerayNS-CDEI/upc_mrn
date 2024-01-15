@@ -38,9 +38,9 @@ public:
 
     // subscribers
     joint_state_sub_ = this->create_subscription<sensor_msgs::msg::JointState>(
-        "joint_states", 10, std::bind(&OdomNew::joint_states_callback, this, std::placeholders::_1));
+        "joint_states", 10, std::bind(&OdomNew::jointStatesCallback, this, std::placeholders::_1));
     original_odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
-        "odom", 10, std::bind(&OdomNew::original_odom_callback, this, std::placeholders::_1));
+        "odom", 10, std::bind(&OdomNew::originalOdomCallback, this, std::placeholders::_1));
 
     // publisher
     odom_new_pub_ = this->create_publisher<nav_msgs::msg::Odometry>("odom_new", 10);
@@ -48,7 +48,7 @@ public:
 
 private:
   // Callback of joint state message
-  void joint_states_callback(const sensor_msgs::msg::JointState &msg)
+  void jointStatesCallback(const sensor_msgs::msg::JointState &msg)
   {
     // RCLCPP_INFO(this->get_logger(), "I heard: '%s'", msg.data.c_str());
     received_joint_state_ = true;
@@ -95,7 +95,7 @@ private:
   }
 
   // Callback of original odometry (just for initialization)
-  void original_odom_callback(const nav_msgs::msg::Odometry &msg)
+  void originalOdomCallback(const nav_msgs::msg::Odometry &msg)
   {
     // RCLCPP_INFO(this->get_logger(), "I heard: '%s'", msg.data.c_str());
 

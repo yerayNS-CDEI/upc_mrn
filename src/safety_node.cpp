@@ -39,13 +39,13 @@ public:
     cmdvel_safe_pub_ = this->create_publisher<geometry_msgs::msg::Twist>("/cmd_vel", 1);
 
     laser_sub_ = this->create_subscription<sensor_msgs::msg::LaserScan>(
-        "/scan", 10, std::bind(&SafetyNode::laser_callback, this, std::placeholders::_1));
+        "/scan", 10, std::bind(&SafetyNode::laserCallback, this, std::placeholders::_1));
     cmdvel_sub_ = this->create_subscription<geometry_msgs::msg::Twist>(
-        "/cmd_vel_teleop", 10, std::bind(&SafetyNode::cmd_vel_callback, this, std::placeholders::_1));
+        "/cmd_vel_teleop", 10, std::bind(&SafetyNode::cmdvelCallback, this, std::placeholders::_1));
   }
 
   // Callback of laser scan
-  void laser_callback(const sensor_msgs::msg::LaserScan &laser_msg)
+  void laserCallback(const sensor_msgs::msg::LaserScan &laser_msg)
   {
     // TODO 1: compute the maximum velocity allowed
     //
@@ -54,7 +54,7 @@ public:
     // END TODO 1
   }
 
-  void cmd_vel_callback(const geometry_msgs::msg::Twist &msg)
+  void cmdvelCallback(const geometry_msgs::msg::Twist &msg)
   {
     geometry_msgs::msg::Twist cmdvel_safe_msg = msg; // copy of the received message
 
