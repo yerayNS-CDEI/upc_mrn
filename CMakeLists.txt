@@ -63,10 +63,11 @@ install(TARGETS
 
 # Install folders: launch, urdf, world, rviz
 install(DIRECTORY
-        launch
         config
-        urdf
+        launch
+        maps
         rviz
+        urdf
         worlds
         DESTINATION share/${PROJECT_NAME}/
 )

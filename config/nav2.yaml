@@ -177,8 +177,9 @@ local_costmap:
           obstacle_min_range: 0.0
       static_layer:
         plugin: "nav2_costmap_2d::StaticLayer"
+        subscribe_to_updates: True
         map_subscribe_transient_local: True
-      always_send_full_costmap: True
+      always_send_full_costmap: False
 
 global_costmap:
   global_costmap:
@@ -209,6 +210,7 @@ global_costmap:
       static_layer:
         plugin: "nav2_costmap_2d::StaticLayer"
         map_subscribe_transient_local: True
+        subscribe_to_updates: True
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 4.0

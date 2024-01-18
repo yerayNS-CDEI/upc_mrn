@@ -89,7 +89,7 @@ void FindFrontiers::mapCallback(const nav_msgs::msg::OccupancyGrid &msg)
 
     // FILTER UNCONNECTED FREE CELLS
     // create map free (assign each cell if it is free)
-    for (auto i = 0; i < map_free.data.size(); ++i)
+    for (unsigned int i = 0; i < map_free.data.size(); ++i)
     {
         if (map_occupancy.data[i] == 0)
             map_free.data[i] = 100;
@@ -103,7 +103,7 @@ void FindFrontiers::mapCallback(const nav_msgs::msg::OccupancyGrid &msg)
                                            [](const std::pair<int, int> &p1, const std::pair<int, int> &p2)
                                            { return p1.second < p2.second; })
                               ->first;
-    for (auto i = 0; i < map_occupancy.data.size(); ++i)
+    for (unsigned int i = 0; i < map_occupancy.data.size(); ++i)
     {
         if (map_occupancy.data[i] == 0 and labels_free[i] != remaining_label)
         {
@@ -121,7 +121,7 @@ void FindFrontiers::mapCallback(const nav_msgs::msg::OccupancyGrid &msg)
 
     // FIND FRONTIERS
     // create map frontiers (assign each cell if it is frontier)
-    for (auto i = 0; i < map_frontiers.data.size(); ++i)
+    for (unsigned int i = 0; i < map_frontiers.data.size(); ++i)
     {
         if (isFrontier(i, map_occupancy))
             map_frontiers.data[i] = 100;
@@ -140,7 +140,7 @@ void FindFrontiers::mapCallback(const nav_msgs::msg::OccupancyGrid &msg)
     upc_mrn::msg::Frontiers frontiers_msg;
     frontiers_msg.header = msg.header;
     frontiers_msg.frontiers.clear();
-    for (auto i = 0; i < labels.size(); ++i)
+    for (unsigned int i = 0; i < labels.size(); ++i)
     {
         if (labels[i] != 0) // labeled cell
         {
@@ -150,7 +150,7 @@ void FindFrontiers::mapCallback(const nav_msgs::msg::OccupancyGrid &msg)
 
             // search existing frontier
             bool new_label = true;
-            for (auto j = 0; j < frontiers_msg.frontiers.size(); j++)
+            for (unsigned int j = 0; j < frontiers_msg.frontiers.size(); j++)
             {
                 // found
                 if (frontiers_labels[j] == labels[i])
@@ -169,26 +169,26 @@ void FindFrontiers::mapCallback(const nav_msgs::msg::OccupancyGrid &msg)
                 new_frontier.cells.push_back(i);
                 new_frontier.cells_points.push_back(cell2point(i, map_frontiers));
                 frontiers_msg.frontiers.push_back(new_frontier);
-                frontier_labels.push_back(labels[i]);
+                frontiers_labels.push_back(labels[i]);
             }
         }
     }
 
     // Compute center cell
-    for (auto i = 0; i < frontiers_msg.frontiers.size(); ++i)
+    for (unsigned int i = 0; i < frontiers_msg.frontiers.size(); ++i)
     {
-        int label = frontier_labels[i];
+        int label = frontiers_labels[i];
 
         // order the frontier cells
         std::deque<int> ordered_cells(0);
         ordered_cells.push_back(frontiers_msg.frontiers[i].cells.front());
         while (ordered_cells.size() < frontiers_msg.frontiers[i].size)
         {
-            int initial_size = ordered_cells.size();
+            auto initial_size = ordered_cells.size();
 
             // connect cells to first cell
             std::vector<int> frontAdjacentPoints = getAdjacentPoints(ordered_cells.front(), map_frontiers);
-            for (auto k = 0; k < frontAdjacentPoints.size(); k++)
+            for (unsigned int k = 0; k < frontAdjacentPoints.size(); k++)
                 if (frontAdjacentPoints[k] != -1 && labels[frontAdjacentPoints[k]] == label && std::find(ordered_cells.begin(), ordered_cells.end(), frontAdjacentPoints[k]) == ordered_cells.end())
                 {
                     ordered_cells.push_front(frontAdjacentPoints[k]);
@@ -197,7 +197,7 @@ void FindFrontiers::mapCallback(const nav_msgs::msg::OccupancyGrid &msg)
 
             // connect cells to last cell
             std::vector<int> backAdjacentPoints = getAdjacentPoints(ordered_cells.back(), map_frontiers);
-            for (auto k = 0; k < backAdjacentPoints.size(); k++)
+            for (unsigned int k = 0; k < backAdjacentPoints.size(); k++)
                 if (backAdjacentPoints[k] != -1 && labels[backAdjacentPoints[k]] == label && std::find(ordered_cells.begin(), ordered_cells.end(), backAdjacentPoints[k]) == ordered_cells.end())
                 {
                     ordered_cells.push_back(backAdjacentPoints[k]);
@@ -225,7 +225,7 @@ bool FindFrontiers::isFrontier(const int &cell, const nav_msgs::msg::OccupancyGr
     if (map.data[cell] == 0) // check if it is free
     {
         auto straightPoints = getStraightPoints(cell, map);
-        for (int i = 0; i < straightPoints.size(); ++i)
+        for (unsigned int i = 0; i < straightPoints.size(); ++i)
             if (straightPoints[i] != -1 && map.data[straightPoints[i]] == -1) // check if any neigbor is unknown
                 return true;
     }
@@ -304,7 +304,7 @@ void FindFrontiers::publishMarkers(const upc_mrn::msg::Frontiers &frontiers_msg)
     markers_.markers[0].action = visualization_msgs::msg::Marker::DELETEALL;
 
     // omplir
-    for (auto i = 0; i < frontiers_msg.frontiers.size(); i++)
+    for (unsigned int i = 0; i < frontiers_msg.frontiers.size(); i++)
     {
         std_msgs::msg::ColorRGBA c;
         c.a = 1.0;

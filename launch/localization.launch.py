@@ -26,6 +26,11 @@ ARGUMENTS = [
     DeclareLaunchArgument('use_sim_time', default_value='true',
                           choices=['true', 'false'],
                           description='use_sim_time'),
+    DeclareLaunchArgument('namespace', default_value='',
+                          description='Robot namespace'),
+    DeclareLaunchArgument('map_name', 
+                          default_value='rooms.yaml',
+                          description='name of the map yaml file to load')
 ]
 
 def generate_launch_description():
@@ -44,7 +49,9 @@ def generate_launch_description():
         PythonLaunchDescriptionSource([localization_launch]),
         launch_arguments=[
             ('namespace', namespace),
-            ('use_sim_time', use_sim_time)
+            ('use_sim_time', use_sim_time),
+            ('map', PathJoinSubstitution([get_package_share_directory('upc_mrn'), 'maps', LaunchConfiguration('map_name')])),
+            ('params', PathJoinSubstitution([get_package_share_directory('upc_mrn'), 'config', 'localization.yaml']))
         ]
     )
 

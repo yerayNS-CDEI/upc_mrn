@@ -26,6 +26,8 @@ ARGUMENTS = [
     DeclareLaunchArgument('use_sim_time', default_value='true',
                           choices=['true', 'false'],
                           description='use_sim_time'),
+    DeclareLaunchArgument('namespace', default_value='',
+                          description='Robot namespace'),
 ]
 
 def generate_launch_description():
@@ -44,7 +46,8 @@ def generate_launch_description():
         PythonLaunchDescriptionSource([slam_launch]),
         launch_arguments=[
             ('namespace', namespace),
-            ('use_sim_time', use_sim_time)
+            ('use_sim_time', use_sim_time),
+            ('params', PathJoinSubstitution([get_package_share_directory('upc_mrn'), 'config', 'slam.yaml']))
         ]
     )
 

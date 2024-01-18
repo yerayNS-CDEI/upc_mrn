@@ -47,12 +47,12 @@ ARGUMENTS = [
                           description='spawn the dock'),
     DeclareLaunchArgument('namespace', default_value='',
                           description='Robot namespace'),
-    DeclareLaunchArgument('localization', default_value='false',
-                          choices=['true', 'false'],
-                          description='Whether to launch localization'),
-    DeclareLaunchArgument('slam', default_value='false',
-                          choices=['true', 'false'],
-                          description='Whether to launch SLAM'),
+    # DeclareLaunchArgument('localization', default_value='false',
+    #                       choices=['true', 'false'],
+    #                       description='Whether to launch localization'),
+    # DeclareLaunchArgument('slam', default_value='false',
+    #                       choices=['true', 'false'],
+    #                       description='Whether to launch SLAM'),
     DeclareLaunchArgument('nav2', default_value='false',
                           choices=['true', 'false'],
                           description='Whether to launch Nav2'),
@@ -90,10 +90,10 @@ def generate_launch_description():
         [pkg_upc_mrn, 'launch', 'robot_description.launch.py'])
     dock_description_launch = PathJoinSubstitution(
         [pkg_irobot_create_common_bringup, 'launch', 'dock_description.launch.py'])
-    localization_launch = PathJoinSubstitution(
-        [pkg_turtlebot4_navigation, 'launch', 'localization.launch.py'])
-    slam_launch = PathJoinSubstitution(
-        [pkg_turtlebot4_navigation, 'launch', 'slam.launch.py'])
+    # localization_launch = PathJoinSubstitution(
+    #     [pkg_turtlebot4_navigation, 'launch', 'localization.launch.py'])
+    # slam_launch = PathJoinSubstitution(
+    #     [pkg_turtlebot4_navigation, 'launch', 'slam.launch.py'])
     nav2_launch = PathJoinSubstitution(
         [pkg_turtlebot4_navigation, 'launch', 'nav2.launch.py'])
 
@@ -242,25 +242,25 @@ def generate_launch_description():
 
     ])
 
-    # Localization
-    localization = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource([localization_launch]),
-        launch_arguments=[
-            ('namespace', namespace),
-            ('use_sim_time', use_sim_time)
-        ],
-        condition=IfCondition(LaunchConfiguration('localization'))
-    )
+    # # Localization
+    # localization = IncludeLaunchDescription(
+    #     PythonLaunchDescriptionSource([localization_launch]),
+    #     launch_arguments=[
+    #         ('namespace', namespace),
+    #         ('use_sim_time', use_sim_time)
+    #     ],
+    #     condition=IfCondition(LaunchConfiguration('localization'))
+    # )
 
-    # SLAM
-    slam = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource([slam_launch]),
-        launch_arguments=[
-            ('namespace', namespace),
-            ('use_sim_time', use_sim_time)
-        ],
-        condition=IfCondition(LaunchConfiguration('slam'))
-    )
+    # # SLAM
+    # slam = IncludeLaunchDescription(
+    #     PythonLaunchDescriptionSource([slam_launch]),
+    #     launch_arguments=[
+    #         ('namespace', namespace),
+    #         ('use_sim_time', use_sim_time)
+    #     ],
+    #     condition=IfCondition(LaunchConfiguration('slam'))
+    # )
 
     # Nav2
     nav2 = IncludeLaunchDescription(
@@ -276,7 +276,7 @@ def generate_launch_description():
     ld = LaunchDescription(ARGUMENTS)
     ld.add_action(param_file_cmd)
     ld.add_action(spawn_robot_group_action)
-    ld.add_action(localization)
-    ld.add_action(slam)
+    # ld.add_action(localization)
+    # ld.add_action(slam)
     ld.add_action(nav2)
     return ld
