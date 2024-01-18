@@ -52,7 +52,7 @@ def generate_launch_description():
         [pkg_upc_mrn, 'launch', 'nav.launch.py'])
 
     sim = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource([sim]),
+        PythonLaunchDescriptionSource(sim),
         launch_arguments=[
             ('use_sim_time', LaunchConfiguration('use_sim_time')),
             ('namespace', LaunchConfiguration('namespace')),
@@ -65,14 +65,14 @@ def generate_launch_description():
     )
 
     slam = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource([slam]),
+        PythonLaunchDescriptionSource(slam),
         launch_arguments=[
             ('use_sim_time', LaunchConfiguration('use_sim_time')),
             ('namespace', LaunchConfiguration('namespace'))]
     )
 
     nav = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource([nav]),
+        PythonLaunchDescriptionSource(nav),
         launch_arguments=[
             ('use_sim_time', LaunchConfiguration('use_sim_time')),
             ('namespace', LaunchConfiguration('namespace'))]
