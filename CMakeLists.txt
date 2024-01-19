@@ -8,14 +8,18 @@ endif()
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(rclcpp_action REQUIRED)
+find_package(rclcpp_components REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
+find_package(nav2_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(visualization_msgs REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
+find_package(tf2_ros REQUIRED)
 
 # Own messages
 set(msg_files
@@ -50,6 +54,11 @@ ament_target_dependencies(find_frontiers rclcpp geometry_msgs nav_msgs visualiza
 rosidl_get_typesupport_target(cpp_typesupport_target "${PROJECT_NAME}" "rosidl_typesupport_cpp")
 target_link_libraries(find_frontiers "${cpp_typesupport_target}")
 
+# ExplorationRandom
+add_executable(exploration_random src/exploration_random.cpp)
+ament_target_dependencies(exploration_random rclcpp geometry_msgs nav_msgs nav2_msgs tf2 tf2_ros tf2_geometry_msgs visualization_msgs rclcpp_action rclcpp_components)
+rosidl_get_typesupport_target(cpp_typesupport_target "${PROJECT_NAME}" "rosidl_typesupport_cpp")
+target_link_libraries(exploration_random "${cpp_typesupport_target}")
 
 # Install nodes
 install(TARGETS

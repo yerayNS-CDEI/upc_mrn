@@ -1,24 +1,26 @@
 #include "exploration_base.h"
 
+namespace upc_mrn
+{
+
 class ExplorationRandom : public ExplorationBase
 {
   protected:
     double goal_dist_threshold_;  // replan if the goal is closer than goal_dist_threshold_
 
   public:
-    ExplorationRandom(ros::NodeHandle& nh);
+    ExplorationRandom();
 
   protected:
     bool                replan() override;
-    geometry_msgs::Pose decideGoal() override;
+    geometry_msgs::msg::Pose decideGoal() override;
 };
 
-ExplorationRandom::ExplorationRandom(ros::NodeHandle& nh) : ExplorationBase(nh)
+ExplorationRandom::ExplorationRandom() : ExplorationBase("exploration_random")
 {
-    alg_name_ = "exploration_random";
-
     // Load parameters from ROS params
-    nh_.param<double>("goal_dist_threshold", goal_dist_threshold_, 0.1);
+    declare_parameter("goal_dist_threshold", 0.1); // default 0.1m
+    get_parameter("goal_dist_threshold", goal_dist_threshold_);
 
     // Start exploration
     exploration_started_ = true;
@@ -39,12 +41,12 @@ bool ExplorationRandom::replan()
     return false;
 }
 
-geometry_msgs::Pose ExplorationRandom::decideGoal()
+geometry_msgs::msg::Pose ExplorationRandom::decideGoal()
 {
     // generate a random pose in a circle centered at current position and radius bigger than the map size
     double radius = std::max(2 * map_.info.height * map_.info.resolution, 2 * map_.info.width * map_.info.resolution);
 
-    geometry_msgs::Pose g = generateRandomPose(radius, robot_pose_);
+    geometry_msgs::msg::Pose g = generateRandomPose(radius, robot_pose_);
 
     // generate again until we get a valid goal
     double path_length;
@@ -53,20 +55,34 @@ geometry_msgs::Pose ExplorationRandom::decideGoal()
     return g;
 }
 
-////// MAIN ////////////////////////////////////////////////////////////////////////////
-int main(int argc, char** argv)
-{
-    ros::init(argc, argv, "exploration_random_node");
-    ros::NodeHandle   nh("~");
-    ExplorationRandom node_exploration(nh);
-    ros::Rate         loop_rate(10);
-
-    while (ros::ok())
-    {
-        ros::spinOnce();
-        loop_rate.sleep();
-
-        node_exploration.loop();
-    }
-    return 0;
 }
+
+RCLCPP_COMPONENTS_REGISTER_NODE(upc_mrn::ExplorationRandom)
+
+////// MAIN ////////////////////////////////////////////////////////////////////////////
+
+int main(int argc, char *argv[])
+{
+  rclcpp::init(argc, argv);
+  rclcpp::spin(std::make_shared<upc_mrn::ExplorationRandom>());
+  rclcpp::shutdown();
+  return 0;
+}
+
+// int main(int argc, char** argv)
+// {
+//     ros::init(argc, argv, "exploration_random_node");
+//     ros::NodeHandle   nh("~");
+//     ExplorationRandom node_exploration(nh);
+//     ros::Rate         loop_rate(10);
+
+//     while (ros::ok())
+//     {
+//         ros::spinOnce();
+//         loop_rate.sleep();
+
+//         node_exploration.loop();
+//     }
+//     return 0;
+// }
+
