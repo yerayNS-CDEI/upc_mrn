@@ -47,9 +47,8 @@ ament_target_dependencies(safety_node rclcpp geometry_msgs sensor_msgs)
 # FindFrontiers
 add_executable(find_frontiers src/find_frontiers.cpp)
 ament_target_dependencies(find_frontiers rclcpp geometry_msgs nav_msgs visualization_msgs)
-rosidl_target_interfaces(find_frontiers
-                         ${PROJECT_NAME} "rosidl_typesupport_cpp")
-
+rosidl_get_typesupport_target(cpp_typesupport_target "${PROJECT_NAME}" "rosidl_typesupport_cpp")
+target_link_libraries(find_frontiers "${cpp_typesupport_target}")
 
 
 # Install nodes

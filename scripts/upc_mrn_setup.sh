@@ -120,6 +120,7 @@ main()
   colcon build --symlink-install &>> ${REDIRECTION} || echo "###ERROR: workspace compilation"	
 
   cd $MYPWD
+  source ~/.bashrc
   echo " --- Done!"
 }
 

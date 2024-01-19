@@ -11,8 +11,7 @@ Panels:
         - /Map1/Update Topic1
         - /Global costmap1/Topic1
         - /Local costmap1/Topic1
-        - /Frontiers map1
-        - /MarkerArray1
+        - /Frontiers1/Namespaces1
       Splitter Ratio: 0.5833333134651184
     Tree Height: 835
   - Class: rviz_common/Selection
@@ -255,19 +254,90 @@ Visualization Manager:
           Value: false
         ir_omni:
           Value: false
+        left_wheel:
+          Value: true
+        map:
+          Value: true
         mouse:
           Value: false
+        odom:
+          Value: true
+        right_wheel:
+          Value: true
         rplidar_link:
           Value: false
         turtlebot4/rplidar_link/rplidar:
           Value: false
+        wheel_drop_left:
+          Value: true
+        wheel_drop_right:
+          Value: true
       Marker Scale: 1
       Name: TF
       Show Arrows: false
       Show Axes: true
       Show Names: false
       Tree:
-        {}
+        map:
+          odom:
+            base_link:
+              bump_front_center:
+                {}
+              bump_front_left:
+                {}
+              bump_front_right:
+                {}
+              bump_left:
+                {}
+              bump_right:
+                {}
+              bumper:
+                {}
+              button_1:
+                {}
+              button_2:
+                {}
+              button_power:
+                {}
+              cliff_front_left:
+                {}
+              cliff_front_right:
+                {}
+              cliff_side_left:
+                {}
+              cliff_side_right:
+                {}
+              front_caster_link:
+                {}
+              imu_link:
+                {}
+              ir_intensity_front_center_left:
+                {}
+              ir_intensity_front_center_right:
+                {}
+              ir_intensity_front_left:
+                {}
+              ir_intensity_front_right:
+                {}
+              ir_intensity_left:
+                {}
+              ir_intensity_right:
+                {}
+              ir_intensity_side_left:
+                {}
+              ir_omni:
+                {}
+              mouse:
+                {}
+              rplidar_link:
+                turtlebot4/rplidar_link/rplidar:
+                  {}
+              wheel_drop_left:
+                left_wheel:
+                  {}
+              wheel_drop_right:
+                right_wheel:
+                  {}
       Update Interval: 0
       Value: true
     - Alpha: 1
@@ -435,32 +505,13 @@ Visualization Manager:
         Value: /local_costmap/costmap_updates
       Use Timestamp: false
       Value: false
-    - Alpha: 0.699999988079071
-      Class: rviz_default_plugins/Map
-      Color Scheme: map
-      Draw Behind: false
-      Enabled: true
-      Name: Frontiers map
-      Topic:
-        Depth: 5
-        Durability Policy: Volatile
-        Filter size: 10
-        History Policy: Keep Last
-        Reliability Policy: Reliable
-        Value: /map_frontiers
-      Update Topic:
-        Depth: 5
-        Durability Policy: Volatile
-        History Policy: Keep Last
-        Reliability Policy: Reliable
-        Value: /map_frontiers_updates
-      Use Timestamp: false
-      Value: true
     - Class: rviz_default_plugins/MarkerArray
       Enabled: true
-      Name: MarkerArray
+      Name: Frontiers
       Namespaces:
-        {}
+        cells: true
+        centers: true
+        ids: true
       Topic:
         Depth: 5
         Durability Policy: Volatile
@@ -506,7 +557,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 12.814918518066406
+      Distance: 19.093852996826172
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
