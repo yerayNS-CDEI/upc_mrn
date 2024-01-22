@@ -53,9 +53,9 @@ ARGUMENTS = [
     # DeclareLaunchArgument('slam', default_value='false',
     #                       choices=['true', 'false'],
     #                       description='Whether to launch SLAM'),
-    DeclareLaunchArgument('nav2', default_value='false',
-                          choices=['true', 'false'],
-                          description='Whether to launch Nav2'),
+    # DeclareLaunchArgument('nav2', default_value='false',
+    #                       choices=['true', 'false'],
+    #                       description='Whether to launch Nav2'),
 ]
 
 for pose_element in ['x', 'y', 'z', 'yaw']:
@@ -68,8 +68,8 @@ def generate_launch_description():
     # Directories
     pkg_turtlebot4_ignition_bringup = get_package_share_directory(
         'turtlebot4_ignition_bringup')
-    pkg_turtlebot4_navigation = get_package_share_directory(
-        'turtlebot4_navigation')
+    # pkg_turtlebot4_navigation = get_package_share_directory(
+    #     'turtlebot4_navigation')
     pkg_irobot_create_common_bringup = get_package_share_directory(
         'irobot_create_common_bringup')
     pkg_irobot_create_ignition_bringup = get_package_share_directory(
@@ -94,8 +94,8 @@ def generate_launch_description():
     #     [pkg_turtlebot4_navigation, 'launch', 'localization.launch.py'])
     # slam_launch = PathJoinSubstitution(
     #     [pkg_turtlebot4_navigation, 'launch', 'slam.launch.py'])
-    nav2_launch = PathJoinSubstitution(
-        [pkg_turtlebot4_navigation, 'launch', 'nav2.launch.py'])
+    # nav2_launch = PathJoinSubstitution(
+    #     [pkg_turtlebot4_navigation, 'launch', 'nav2.launch.py'])
 
     # Parameters
     param_file_cmd = DeclareLaunchArgument(
@@ -262,15 +262,15 @@ def generate_launch_description():
     #     condition=IfCondition(LaunchConfiguration('slam'))
     # )
 
-    # Nav2
-    nav2 = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource([nav2_launch]),
-        launch_arguments=[
-            ('namespace', namespace),
-            ('use_sim_time', use_sim_time)
-        ],
-        condition=IfCondition(LaunchConfiguration('nav2'))
-    )
+    # # Nav2
+    # nav2 = IncludeLaunchDescription(
+    #     PythonLaunchDescriptionSource([nav2_launch]),
+    #     launch_arguments=[
+    #         ('namespace', namespace),
+    #         ('use_sim_time', use_sim_time)
+    #     ],
+    #     condition=IfCondition(LaunchConfiguration('nav2'))
+    # )
 
     # Define LaunchDescription variable
     ld = LaunchDescription(ARGUMENTS)
@@ -278,5 +278,5 @@ def generate_launch_description():
     ld.add_action(spawn_robot_group_action)
     # ld.add_action(localization)
     # ld.add_action(slam)
-    ld.add_action(nav2)
+    # ld.add_action(nav2)
     return ld

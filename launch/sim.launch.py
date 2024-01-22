@@ -21,7 +21,7 @@ from launch.actions import DeclareLaunchArgument
 from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
-
+import launch_ros.actions
 
 ARGUMENTS = [
     DeclareLaunchArgument('namespace', default_value='',
@@ -42,6 +42,11 @@ for pose_element in ['x', 'y', 'z', 'yaw']:
 
 
 def generate_launch_description():
+
+    # override safety and reflexes on all nodes following the line above
+    safety_param_set = launch_ros.actions.SetParameter(name='safety_override', value="full")
+    reflexes_param_set = launch_ros.actions.SetParameter(name='reflexes_enabled', value=False)
+
     # Directories
     pkg_upc_mrn = get_package_share_directory(
         'upc_mrn')
@@ -72,6 +77,8 @@ def generate_launch_description():
 
     # Create launch description and add actions
     ld = LaunchDescription(ARGUMENTS)
+    ld.add_action(safety_param_set)
+    ld.add_action(reflexes_param_set)
     ld.add_action(ignition)
     ld.add_action(robot_spawn)
     return ld
