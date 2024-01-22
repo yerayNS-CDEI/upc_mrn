@@ -1,8 +1,5 @@
 #include "exploration_base.h"
 
-namespace upc_mrn
-{
-
 class ExplorationRandom : public ExplorationBase
 {
   protected:
@@ -55,34 +52,12 @@ geometry_msgs::msg::Pose ExplorationRandom::decideGoal()
     return g;
 }
 
-}
-
-RCLCPP_COMPONENTS_REGISTER_NODE(upc_mrn::ExplorationRandom)
-
 ////// MAIN ////////////////////////////////////////////////////////////////////////////
 
 int main(int argc, char *argv[])
 {
   rclcpp::init(argc, argv);
-  rclcpp::spin(std::make_shared<upc_mrn::ExplorationRandom>());
+  rclcpp::spin(std::make_shared<ExplorationRandom>());
   rclcpp::shutdown();
   return 0;
 }
-
-// int main(int argc, char** argv)
-// {
-//     ros::init(argc, argv, "exploration_random_node");
-//     ros::NodeHandle   nh("~");
-//     ExplorationRandom node_exploration(nh);
-//     ros::Rate         loop_rate(10);
-
-//     while (ros::ok())
-//     {
-//         ros::spinOnce();
-//         loop_rate.sleep();
-
-//         node_exploration.loop();
-//     }
-//     return 0;
-// }
-

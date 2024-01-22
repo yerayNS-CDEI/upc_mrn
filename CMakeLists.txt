@@ -9,7 +9,7 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_action REQUIRED)
-find_package(rclcpp_components REQUIRED)
+# find_package(rclcpp_components REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
@@ -28,35 +28,69 @@ set(msg_files
 )
 rosidl_generate_interfaces(${PROJECT_NAME}
                            ${msg_files}
-                           DEPENDENCIES builtin_interfaces geometry_msgs std_msgs
+                           DEPENDENCIES 
+                           builtin_interfaces
+                           geometry_msgs
+                           std_msgs
 )
 ament_export_dependencies(rosidl_default_runtime)
 
 # PubTwist
 add_executable(pub_twist src/pub_twist.cpp)
-ament_target_dependencies(pub_twist rclcpp geometry_msgs)
+ament_target_dependencies(pub_twist
+                          rclcpp
+                          geometry_msgs)
 
 # OdomNew
 add_executable(odom_new src/odom_new.cpp)
-ament_target_dependencies(odom_new rclcpp tf2 tf2_geometry_msgs nav_msgs sensor_msgs)
+ament_target_dependencies(odom_new
+                          rclcpp
+                          tf2
+                          tf2_geometry_msgs
+                          nav_msgs
+                          sensor_msgs)
 
 # LaserProcessor
 add_executable(laser_processor src/laser_processor.cpp)
-ament_target_dependencies(laser_processor rclcpp tf2 tf2_geometry_msgs visualization_msgs nav_msgs sensor_msgs)
+ament_target_dependencies(laser_processor
+                          rclcpp
+                          tf2
+                          tf2_geometry_msgs
+                          visualization_msgs
+                          nav_msgs
+                          sensor_msgs)
 
 # SafetyNode
 add_executable(safety_node src/safety_node.cpp)
-ament_target_dependencies(safety_node rclcpp geometry_msgs sensor_msgs)
+ament_target_dependencies(safety_node
+                          rclcpp
+                          geometry_msgs
+                          sensor_msgs)
 
 # FindFrontiers
 add_executable(find_frontiers src/find_frontiers.cpp)
-ament_target_dependencies(find_frontiers rclcpp geometry_msgs nav_msgs visualization_msgs)
+ament_target_dependencies(find_frontiers
+                          rclcpp
+                          geometry_msgs
+                          nav_msgs
+                          visualization_msgs)
 rosidl_get_typesupport_target(cpp_typesupport_target "${PROJECT_NAME}" "rosidl_typesupport_cpp")
 target_link_libraries(find_frontiers "${cpp_typesupport_target}")
 
 # ExplorationRandom
 add_executable(exploration_random src/exploration_random.cpp)
-ament_target_dependencies(exploration_random rclcpp geometry_msgs nav_msgs nav2_msgs tf2 tf2_ros tf2_geometry_msgs visualization_msgs rclcpp_action rclcpp_components)
+ament_target_dependencies(exploration_random
+                          rclcpp
+                          geometry_msgs
+                          nav_msgs
+                          nav2_msgs
+                          tf2
+                          tf2_ros
+                          tf2_geometry_msgs
+                          visualization_msgs
+                          rclcpp_action
+                          #rclcpp_components
+                          )
 rosidl_get_typesupport_target(cpp_typesupport_target "${PROJECT_NAME}" "rosidl_typesupport_cpp")
 target_link_libraries(exploration_random "${cpp_typesupport_target}")
 
