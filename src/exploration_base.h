@@ -3,6 +3,7 @@
 #include <memory>
 #include <string>
 #include <fstream>
+#include <stdlib.h>
 
 #include "rclcpp/rclcpp.hpp"
 #include "nav_msgs/msg/occupancy_grid.hpp"
@@ -10,8 +11,8 @@
 #include "nav_msgs/msg/odometry.hpp"
 #include "nav_msgs/msg/path.hpp"
 
-#include "rclcpp_action/rclcpp_action.hpp"
 // Action example: https://github.com/ros2/examples/blob/humble/rclcpp/actions/minimal_action_client/member_functions.cpp
+#include "rclcpp_action/rclcpp_action.hpp"
 #include "nav2_msgs/action/navigate_to_pose.hpp"
 #include "nav2_msgs/action/compute_path_to_pose.hpp"
 
@@ -30,45 +31,48 @@ public:
 
 protected:
     // ------------------ ATTRIBUTES ------------------
-    std::string algorithm_variant_;
+    std::string algorithm_variant_; // variant of the algorithm (in case you need it)
+    std::string results_file_;      // name of the results file (csv)
+    std::string world_;             // name of the world
 
+    int robot_status_;                    // 0: moving, 1: goal reached, 2: failed to reach goal
+    geometry_msgs::msg::Pose robot_pose_; // current robot pose
+    geometry_msgs::msg::Pose goal_;       // last goal sent
+    rclcpp::Time goal_stamp_;             // time when last goal was sent
+    double goal_time_;                    // seconds since last goal was sent
+    double goal_distance_;                // remaining distance to reach the last goal
+
+    // Subscribers/publishers
     rclcpp::Subscription<upc_mrn::msg::Frontiers>::SharedPtr frontiers_sub_;
     rclcpp::Subscription<nav_msgs::msg::OccupancyGrid>::SharedPtr map_sub_;
     rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_new_pub_;
-
-    // Planner actions
-    rclcpp_action::Client<NavToPose>::SharedPtr nav_to_pose_client_;
-    rclcpp_action::Client<ComputePath>::SharedPtr compute_path_client_;
-
-    // tf::TransformListener listener_;
-    std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
-    std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
-
-    int robot_status_;                     // 0: moving, 1: goal reached, 2: failed to reach goal
-    geometry_msgs::msg::Pose target_goal_; // last goal sent
-    geometry_msgs::msg::Pose robot_pose_;  // current robot pose
-
     nav_msgs::msg::OccupancyGrid map_;
     upc_mrn::msg::Frontiers frontiers_msg_;
 
-    // STATS
-    int num_cells_;                  // amount of map cells (height*width)
+    // actions
+    rclcpp_action::Client<NavToPose>::SharedPtr nav_to_pose_client_;
+    rclcpp_action::Client<ComputePath>::SharedPtr compute_path_client_;
+
+    // tf
+    std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
+    std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
+
+    // GLOBAL STATS
     int cells_explored_;             // explored cells (free or obstacle)
     int num_goals_sent_;             // total goals sent
     int num_goals_ko_;               // total goals cancelled
     double distance_traveled_;       // total absolute distance traveled during exploration (m)
     double angle_traveled_;          // total absolute angle turned during exploration (rad)
     rclcpp::Time begin_exploration_; // used to compute the total exploration time
-    rclcpp::Time time_target_goal_;  // time when last goal was sent
-    bool exploration_ended_;         // flag to finish exploration
-    bool exploration_started_;       // flag to start exploration
-    bool got_map_;                   // flag to ack the map reception
-    std::string results_file_;       // name of the results file (csv)
-    std::string scene_;              // name of the scene
+
+    // Flags
+    bool exploration_ended_;   // flag to finish exploration
+    bool exploration_started_; // flag to start exploration
+    bool got_map_;             // flag to ack the map reception
 
     // ------------------ METHODS ------------------
 public:
-    ExplorationBase(const std::string &_name); //, const rclcpp::NodeOptions & _node_options = rclcpp::NodeOptions());
+    ExplorationBase(const std::string &_name);
     ~ExplorationBase();
     void loop();
 
@@ -86,10 +90,12 @@ protected:
     void finish();
 
     // AUXILIARY
-    geometry_msgs::msg::Pose generateRandomPose(float radius, geometry_msgs::msg::Pose reference_pose) const;
+    geometry_msgs::msg::Pose generateRandomPose(float radius, geometry_msgs::msg::Pose reference_pose);
+    bool isValidGoal(const geometry_msgs::msg::Pose &goal, double &path_distance);
     bool isInMap(const geometry_msgs::msg::Point &position) const;
+    bool isFree(const geometry_msgs::msg::Point &position) const;
     geometry_msgs::msg::Point getMapCenter() const;
-    bool isValidGoal(const geometry_msgs::msg::Pose &goal) const;
+    int floor0(const float &value) const;
 
     // NAVIGATION
     // send goal
@@ -99,16 +105,15 @@ protected:
                               const std::shared_ptr<const NavToPose::Feedback> feedback);
     void goalResultCallback(const GoalHandleNavToPose::WrappedResult &result);
     // compute path
-    double computePathLength(const geometry_msgs::msg::Pose &goal_pose) const;
+    double computePathLength(const geometry_msgs::msg::Pose &goal_pose);
 
     // TF
     bool updateRobotPose();
 };
 
-ExplorationBase::ExplorationBase(const std::string &_name) //, const rclcpp::NodeOptions & _node_options = rclcpp::NodeOptions());
-    : Node(_name),                                         // Node(_name, _node_options),
+ExplorationBase::ExplorationBase(const std::string &_name)
+    : Node(_name),
       robot_status_(1),
-      num_cells_(0),
       cells_explored_(0),
       num_goals_sent_(0),
       num_goals_ko_(0),
@@ -125,14 +130,13 @@ ExplorationBase::ExplorationBase(const std::string &_name) //, const rclcpp::Nod
     frontiers_sub_ = this->create_subscription<upc_mrn::msg::Frontiers>(
         "/frontiers", 1, std::bind(&ExplorationBase::frontiersCallback, this, std::placeholders::_1));
 
-    // // services
-    // get_plan_client_ = nh_.serviceClient<nav_msgs::GetPlan>("/move_base/NavfnROS/make_plan");
-
     // Get parameters from ROS
     declare_parameter("results_file", "~/exploration_results.csv");
     get_parameter("results_file", results_file_);
-    declare_parameter("scene", "undefined");
-    get_parameter("scene", scene_);
+    declare_parameter("world", "undefined");
+    get_parameter("world", world_);
+    declare_parameter("algorithm_variant", "");
+    get_parameter("algorithm_variant", algorithm_variant_);
 
     // substitute '~' by home path
     auto found = results_file_.find('~');
@@ -160,16 +164,13 @@ ExplorationBase::ExplorationBase(const std::string &_name) //, const rclcpp::Nod
     }
 
     // action of nav2
-    nav_to_pose_client_ = rclcpp_action::create_client<NavToPose>(
-        this,
-        "bt_navigator/navigate_to_pose");
+    nav_to_pose_client_ = rclcpp_action::create_client<NavToPose>(this, "bt_navigator/navigate_to_pose");
 
     // tf listener
-    tf_buffer_ =
-        std::make_unique<tf2_ros::Buffer>(this->get_clock());
-    tf_listener_ =
-        std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
+    tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
+    tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
 
+    // seed for random
     srand((unsigned)time(NULL));
 }
 
@@ -182,6 +183,7 @@ ExplorationBase::~ExplorationBase()
 
 void ExplorationBase::mapCallback(const nav_msgs::msg::OccupancyGrid &msg)
 {
+    // store map
     map_ = msg;
 
     // compute explored cells
@@ -190,7 +192,7 @@ void ExplorationBase::mapCallback(const nav_msgs::msg::OccupancyGrid &msg)
         if (map_.data[i] != -1)
             cells_explored_++;
 
-    // ack
+    // flag
     got_map_ = true;
 }
 
@@ -241,8 +243,7 @@ void ExplorationBase::loop()
     {
         if (replan())
         {
-            target_goal_ = decideGoalBase();
-            sendGoal(target_goal_);
+            sendGoal(decideGoalBase());
         }
     }
     else
@@ -260,19 +261,22 @@ void ExplorationBase::finish()
     int t_sec = int(t) % 60;
 
     // print stats
-    printf("//////////////////////////////////////////////\n");
-    printf("////////// EXPLORATION FINISHED! /////////////\n");
-    printf("//////////////////////////////////////////////\n");
+    printf("//////////////////////////////////////////////////////\n");
+    if (exploration_ended_)
+        printf("//////////////// EXPLORATION FINISHED ////////////////\n");
+    else
+        printf("// EXPLORATION ENDED BEFORE EXPLORING THE WHOLE MAP //\n");
+    printf("//////////////////////////////////////////////////////\n");
     printf("\tAlgorithm name: %s\n", this->get_name());
     printf("\tAlgorithm variant: %s\n", algorithm_variant_.c_str());
-    printf("\tSent %i goals (cancelled %i)\n", num_goals_sent_, num_goals_ko_);
+    printf("\tWorld: %s\n", world_.c_str());
+    printf("\tSent %i goals (aborted %i)\n", num_goals_sent_, num_goals_ko_);
     printf("\tDistance traveled %.2f m\n", distance_traveled_);
     printf("\tAngle turned %.2f m\n", angle_traveled_);
     printf("\tDuration %2.2i:%2.2i min\n", t_min, t_sec);
     printf("\tExplored %.2f m^2 (%d cells)\n\n",
            cells_explored_ * map_.info.resolution * map_.info.resolution,
            cells_explored_);
-    printf("!!!!!! If you want to save the map, remember:\n\trosrun map_server map_saver -f my_map_name\n\n");
 
     // store stats in CSV
     printf("Storing results in file: %s\n", results_file_.c_str());
@@ -283,8 +287,17 @@ void ExplorationBase::finish()
         // initialize file with header
         if (outfile.tellp() == 0)
         {
-            outfile << "#alg name, alg variant, date_time, scene, distance traveled (m), angle turned (rad), duration (s), cells "
-                       "explored\n";
+            outfile << "#DATE_TIME, "
+                    << "FINISHED, "
+                    << "ALGORITHM NAME, "
+                    << "VARIANT, "
+                    << "WORLD, "
+                    << "GOALS SENT, "
+                    << "GOALS ABORTED, "
+                    << "DISTANCE TRAVELED (m), "
+                    << "ANGLE TURNED (rad), "
+                    << "DURATION (s), "
+                    << "CELLS EXPLORED\n";
         }
 
         // current date and time on the current system
@@ -293,10 +306,14 @@ void ExplorationBase::finish()
         if (date_time[strlen(date_time) - 1] == '\n')
             date_time[strlen(date_time) - 1] = '\0'; // remove line break at the end
 
-        outfile << this->get_name() << ", "   //
+        outfile << date_time << ", "          //
+                << exploration_ended_ << ", " //
+                << this->get_name() << ", "   //
                 << algorithm_variant_ << ", " //
-                << date_time << ", "          //
-                << scene_ << ", "             //
+                << world_ << ", "             //
+                << num_goals_sent_ << ", "    //
+                << num_goals_ko_ << ", "      //
+                << world_ << ", "             //
                 << distance_traveled_ << ", " //
                 << angle_traveled_ << ", "    //
                 << t << ", "                  //
@@ -307,14 +324,13 @@ void ExplorationBase::finish()
     else
     {
         printf("ExplorationBase::finish(): couldn't open/write the results file %s\n", results_file_.c_str());
-        perror("error message:");
     }
 
     rclcpp::shutdown();
 }
 
 ///// AUXILIARY FUNCTIONS //////////////////////////////////////////////////////////////////////
-geometry_msgs::msg::Pose ExplorationBase::generateRandomPose(float radius, geometry_msgs::msg::Pose reference_pose) const
+geometry_msgs::msg::Pose ExplorationBase::generateRandomPose(float radius, geometry_msgs::msg::Pose reference_pose)
 {
     geometry_msgs::msg::Pose goal_pose;
 
@@ -338,10 +354,11 @@ geometry_msgs::msg::Pose ExplorationBase::generateRandomPose(float radius, geome
         reference_pose.position = getMapCenter();
     }
 
-    // srand((unsigned)time(NULL));
+    // Random radius and angle
     float rand_yaw = 2 * M_PI * (rand() % 100) / 100.0;
     float rand_r = radius * (rand() % 100) / 100.0;
 
+    // Compose over reference pose
     goal_pose.position.x = reference_pose.position.x + rand_r * cos(rand_yaw);
     goal_pose.position.y = reference_pose.position.y + rand_r * sin(rand_yaw);
     tf2::Quaternion q;
@@ -349,6 +366,17 @@ geometry_msgs::msg::Pose ExplorationBase::generateRandomPose(float radius, geome
     goal_pose.orientation = tf2::toMsg(q);
 
     return goal_pose;
+}
+
+bool ExplorationBase::isValidGoal(const geometry_msgs::msg::Pose &goal, double &path_length)
+{
+    // not free (also returning false if out of map)
+    if (not isFree(goal.position))
+        return false;
+
+    // return true if a path to that pose could be computed
+    path_length = computePathLength(goal);
+    return path_length >= 0;
 }
 
 bool ExplorationBase::isInMap(const geometry_msgs::msg::Point &position) const
@@ -364,6 +392,28 @@ bool ExplorationBase::isInMap(const geometry_msgs::msg::Point &position) const
            dy_map <= map_.info.height * map_.info.resolution;
 }
 
+bool ExplorationBase::isFree(const geometry_msgs::msg::Point &point) const
+{
+    if (not isInMap(point))
+        return false;
+
+    // cell
+    int x_cell = floor0((point.x - map_.info.origin.position.x) / map_.info.resolution);
+    int y_cell = floor0((point.y - map_.info.origin.position.y) / map_.info.resolution);
+    int cell = x_cell + (y_cell)*map_.info.width;
+
+    // return if free
+    return map_.data[cell] == 0;
+}
+
+int ExplorationBase::floor0(const float &value) const
+{
+    if (value < 0.0)
+        return ceil(value);
+    else
+        return floor(value);
+}
+
 geometry_msgs::msg::Point ExplorationBase::getMapCenter() const
 {
     geometry_msgs::msg::Point center;
@@ -377,16 +427,6 @@ geometry_msgs::msg::Point ExplorationBase::getMapCenter() const
     return center;
 }
 
-bool ExplorationBase::isValidGoal(const geometry_msgs::msg::Pose &goal, double &path_length) const
-{
-    // not in map
-    if (not isInMap(goal.position))
-        return false;
-
-    // return true if a path to that pose could be computed
-    return computePathLength(goal) >= 0;
-}
-
 // NAVIGATION FUNCTIONS ////////////////////////////////////////////////////////////////////////////////////////
 bool ExplorationBase::sendGoal(const geometry_msgs::msg::Pose &goal_pose)
 {
@@ -396,17 +436,22 @@ bool ExplorationBase::sendGoal(const geometry_msgs::msg::Pose &goal_pose)
     {
         RCLCPP_ERROR(this->get_logger(), "Action server not available after waiting");
         return false;
-        // rclcpp::shutdown();
     }
 
+    // Fill goal msg
     nav2_msgs::action::NavigateToPose::Goal goal;
     goal.pose.header.frame_id = "map";
     goal.pose.header.stamp = this->now();
     goal.pose.pose = goal_pose;
 
+    // reset goal stats
+    goal_ = goal_pose;
+    goal_distance_ = -1;
+    goal_time_ = 0;
+    goal_stamp_ = goal.pose.header.stamp;
     num_goals_sent_++;
-    time_target_goal_ = goal.pose.header.stamp;
 
+    // print
     RCLCPP_INFO(this->get_logger(), "ExplorationBase::moveRobot(): Sending Goal #%d: x=%4.2f, y=%4.2f, yaw=%4.2f in frame_id=%s",
                 num_goals_sent_,
                 goal.pose.pose.position.x,
@@ -419,7 +464,7 @@ bool ExplorationBase::sendGoal(const geometry_msgs::msg::Pose &goal_pose)
     int elapsed_time_seconds = int(t.seconds()) % 60;
 
     printf(
-        ">>> Exploration status:\n\tSent %d goals (cancelled %d). Distance traveled %.2f m. Angle turned %.1f. "
+        ">>> Exploration status:\n\tSent %d goals (aborted %d). Distance traveled %.2f m. Angle turned %.1f. "
         "Duration: %2.2i:%2.2i min. Explored %.2f m^2 (%d cells)\n",
         num_goals_sent_,
         num_goals_ko_,
@@ -430,6 +475,7 @@ bool ExplorationBase::sendGoal(const geometry_msgs::msg::Pose &goal_pose)
         cells_explored_ * map_.info.resolution * map_.info.resolution,
         cells_explored_);
 
+    // Send goal
     auto send_goal_options = rclcpp_action::Client<NavToPose>::SendGoalOptions();
     send_goal_options.goal_response_callback =
         std::bind(&ExplorationBase::goalResponseCallback, this, _1);
@@ -460,8 +506,11 @@ void ExplorationBase::goalResponseCallback(const GoalHandleNavToPose::SharedPtr 
 void ExplorationBase::goalFeedbackCallback(const GoalHandleNavToPose::SharedPtr &goal_handle,
                                            const std::shared_ptr<const NavToPose::Feedback> feedback)
 {
-    // nothing
     RCLCPP_INFO(this->get_logger(), "Received feedback from nav_to_pose action");
+
+    goal_distance_ = feedback->distance_remaining;
+    goal_time_ = rclcpp::Duration(feedback->navigation_time).seconds();
+    RCLCPP_INFO(this->get_logger(), "feedback->navigation_time = %f (should be %f)", goal_time_, (this->now() - goal_stamp_).seconds());
 }
 
 void ExplorationBase::goalResultCallback(const GoalHandleNavToPose::WrappedResult &result)
@@ -471,17 +520,17 @@ void ExplorationBase::goalResultCallback(const GoalHandleNavToPose::WrappedResul
     switch (result.code)
     {
     case rclcpp_action::ResultCode::SUCCEEDED:
-        RCLCPP_ERROR(node->get_logger(), "Result from nav_to_pose: Goal was reached");
+        RCLCPP_ERROR(this->get_logger(), "Result from nav_to_pose: Goal was reached");
         robot_status_ = 1; // reached
         return;
     case rclcpp_action::ResultCode::ABORTED:
-        RCLCPP_ERROR(node->get_logger(), "Result from nav_to_pose: Goal was aborted");
+        RCLCPP_ERROR(this->get_logger(), "Result from nav_to_pose: Goal was aborted");
         break;
     case rclcpp_action::ResultCode::CANCELED:
-        RCLCPP_ERROR(node->get_logger(), "Result from nav_to_pose: Goal was canceled");
+        RCLCPP_ERROR(this->get_logger(), "Result from nav_to_pose: Goal was canceled");
         break;
     default:
-        RCLCPP_ERROR(node->get_logger(), "Result from nav_to_pose: Unknown result code");
+        RCLCPP_ERROR(this->get_logger(), "Result from nav_to_pose: Unknown result code");
         break;
     }
     robot_status_ = 2; // aborted/cancelled
@@ -492,40 +541,39 @@ double ExplorationBase::computePathLength(const geometry_msgs::msg::Pose &goal_p
 {
     if (!compute_path_client_->wait_for_action_server(std::chrono::milliseconds(50)))
     {
-        RCLCPP_ERROR(node->get_logger(), "Action server compute_path_to_pose not available after waiting 50ms");
+        RCLCPP_ERROR(this->get_logger(), "Action server compute_path_to_pose not available after waiting 50ms");
         return -1;
     }
 
     // Populate a goal
-    RCLCPP_INFO(node->get_logger(), "Sending goal to compute_path_to_pose");
+    RCLCPP_INFO(this->get_logger(), "Sending goal to compute_path_to_pose");
     auto goal_msg = ComputePath::Goal();
-    goal_msg.goal = goal_pose;
+    goal_msg.goal.pose = goal_pose;
     goal_msg.use_start = false; // use current robot pose as path start
 
-    // Ask server to achieve some goal and wait until it's accepted
-    auto goal_handle_future = action_client->async_send_goal(goal_msg);
-    if (rclcpp::spin_until_future_complete(node, goal_handle_future) !=
+    // Wait 50ms for the server to accept the goal
+    auto goal_handle_future = compute_path_client_->async_send_goal(goal_msg);
+    if (rclcpp::spin_until_future_complete(shared_from_this(), goal_handle_future, std::chrono::milliseconds(50)) !=
         rclcpp::FutureReturnCode::SUCCESS)
     {
-        RCLCPP_ERROR(node->get_logger(), "compute_path_to_pose: send goal call failed :(");
+        RCLCPP_ERROR(this->get_logger(), "compute_path_to_pose: send goal call failed :(");
         return -1;
     }
 
-    GoalHandleComputePath goal_handle = goal_handle_future.get();
+    GoalHandleComputePath::SharedPtr goal_handle = goal_handle_future.get();
     if (!goal_handle)
     {
-        RCLCPP_ERROR(node->get_logger(), "compute_path_to_pose: Goal was rejected by the server");
+        RCLCPP_ERROR(this->get_logger(), "compute_path_to_pose: Goal was rejected by the server");
         return -1;
     }
 
     // Wait 50ms more for the server to be done with the goal
-    auto result_future = action_client->async_get_result(goal_handle);
-
-    RCLCPP_INFO(node->get_logger(), "compute_path_to_pose: Waiting for result");
-    if (rclcpp::spin_until_future_complete(node, result_future, std::chrono::milliseconds(50)) !=
+    auto result_future = compute_path_client_->async_get_result(goal_handle);
+    RCLCPP_INFO(this->get_logger(), "compute_path_to_pose: Waiting for result");
+    if (rclcpp::spin_until_future_complete(shared_from_this(), result_future, std::chrono::milliseconds(50)) !=
         rclcpp::FutureReturnCode::SUCCESS)
     {
-        RCLCPP_ERROR(node->get_logger(), "compute_path_to_pose: get result call failed :(");
+        RCLCPP_ERROR(this->get_logger(), "compute_path_to_pose: get result call failed :(");
         return -1;
     }
 
@@ -537,49 +585,13 @@ double ExplorationBase::computePathLength(const geometry_msgs::msg::Pose &goal_p
     case rclcpp_action::ResultCode::SUCCEEDED:
         break;
     case rclcpp_action::ResultCode::ABORTED:
-        RCLCPP_ERROR(node->get_logger(), "compute_path_to_pose: Goal was aborted");
+        RCLCPP_ERROR(this->get_logger(), "compute_path_to_pose: Goal was aborted");
         return -1;
     case rclcpp_action::ResultCode::CANCELED:
-        RCLCPP_ERROR(node->get_logger(), "compute_path_to_pose: Goal was canceled");
+        RCLCPP_ERROR(this->get_logger(), "compute_path_to_pose: Goal was canceled");
         return -1;
     default:
-        RCLCPP_ERROR(node->get_logger(), "compute_path_to_pose: Unknown result code");
-        return -1;
-    }
-
-    RCLCPP_INFO(node->get_logger(), "compute_path_to_pose: result received");
-    // check error code
-    switch (wrapped_result.result->error_code)
-    {
-    case nav2_msgs::action::ComputePathToPose::NONE:
-        RCLCPP_INFO(node->get_logger(), "Result returned error code NONE");
-        break;
-    case nav2_msgs::action::ComputePathToPose::UNKNOWN:
-        RCLCPP_ERROR(node->get_logger(), "Result returned error code: UNKNOWN");
-        return -1;
-    case nav2_msgs::action::ComputePathToPose::INVALID_PLANNER:
-        RCLCPP_ERROR(node->get_logger(), "Result returned error code: INVALID_PLANNER");
-        return -1;
-    case nav2_msgs::action::ComputePathToPose::TF_ERROR:
-        RCLCPP_ERROR(node->get_logger(), "Result returned error code: TF_ERROR");
-        return -1;
-    case nav2_msgs::action::ComputePathToPose::START_OUTSIDE_MAP:
-        RCLCPP_ERROR(node->get_logger(), "Result returned error code: START_OUTSIDE_MAP");
-        return -1;
-    case nav2_msgs::action::ComputePathToPose::GOAL_OUTSIDE_MAP:
-        RCLCPP_ERROR(node->get_logger(), "Result returned error code: GOAL_OUTSIDE_MAP");
-        return -1;
-    case nav2_msgs::action::ComputePathToPose::START_OCCUPIED:
-        RCLCPP_ERROR(node->get_logger(), "Result returned error code: START_OCCUPIED");
-        return -1;
-    case nav2_msgs::action::ComputePathToPose::GOAL_OCCUPIED:
-        RCLCPP_ERROR(node->get_logger(), "Result returned error code: GOAL_OCCUPIED");
-        return -1;
-    case nav2_msgs::action::ComputePathToPose::TIMEOUT:
-        RCLCPP_ERROR(node->get_logger(), "Result returned error code: TIMEOUT");
-        return -1;
-    case nav2_msgs::action::ComputePathToPose::NO_VALID_PATH:
-        RCLCPP_ERROR(node->get_logger(), "Result returned error code: NO_VALID_PATH");
+        RCLCPP_ERROR(this->get_logger(), "compute_path_to_pose: Unknown result code");
         return -1;
     }
 

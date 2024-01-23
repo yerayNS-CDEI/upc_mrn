@@ -43,7 +43,7 @@ for pose_element in ['x', 'y', 'z', 'yaw']:
 
 def generate_launch_description():
 
-    # override safety and reflexes on all nodes following the line above
+    # set params safety_override and reflexes
     safety_param_set = launch_ros.actions.SetParameter(name='safety_override', value="full")
     reflexes_param_set = launch_ros.actions.SetParameter(name='reflexes_enabled', value=False)
 

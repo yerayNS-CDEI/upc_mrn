@@ -26,8 +26,8 @@ ExplorationRandom::ExplorationRandom() : ExplorationBase("exploration_random")
 bool ExplorationRandom::replan()
 {
     // Compute distance to goal
-    double dist_goal = std::sqrt(std::pow(target_goal_.position.x - robot_pose_.position.x, 2) +
-                                 std::pow(target_goal_.position.y - robot_pose_.position.y, 2));
+    double dist_goal = std::sqrt(std::pow(goal_.position.x - robot_pose_.position.x, 2) +
+                                 std::pow(goal_.position.y - robot_pose_.position.y, 2));
 
     // Replan if the goal is closer than 'goal_dist_threshold_' m
     if (dist_goal < goal_dist_threshold_) return true;

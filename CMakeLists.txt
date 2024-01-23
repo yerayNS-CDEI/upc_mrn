@@ -89,7 +89,6 @@ ament_target_dependencies(exploration_random
                           tf2_geometry_msgs
                           visualization_msgs
                           rclcpp_action
-                          #rclcpp_components
                           )
 rosidl_get_typesupport_target(cpp_typesupport_target "${PROJECT_NAME}" "rosidl_typesupport_cpp")
 target_link_libraries(exploration_random "${cpp_typesupport_target}")
@@ -101,6 +100,7 @@ install(TARGETS
         laser_processor
         safety_node
         find_frontiers
+        exploration_random
         DESTINATION lib/${PROJECT_NAME})
 
 # Install folders: launch, urdf, world, rviz

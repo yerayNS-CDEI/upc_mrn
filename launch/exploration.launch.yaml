@@ -1,0 +1,41 @@
+launch:
+
+# args that can be set from the command line or a default will be used
+- arg:
+    name: "node_name"
+    default: "exploration_random"
+- arg:
+    name: "algorithm_variant"
+    default: ""
+- arg:
+    name: "world"
+    default: "small" #small, large
+- arg:
+    name: "algorithm_variant"
+    default: ""
+- arg:
+    name: "results_file"
+    default: "~/exploration_results.csv"
+- arg:
+    name: "gui"
+    default: "false"
+
+# include frontiers launch (simulation + SLAM + find_frontiers + navigation)
+- include:
+    file: "$(find-pkg-share upc_mrn)/launch/frontiers.launch.yaml"
+
+# run exploration node
+- node:
+    pkg: "upc_mrn"
+    exec: "$(var node_name)"
+    name: "exploration"
+    params:
+    - 
+      name: "world"
+      value: "$(var world)"
+    - 
+      name: "algorithm_variant"
+      value: "$(var algorithm_variant)"
+    - 
+      name: "results_file"
+      value: "$(var results_file)"

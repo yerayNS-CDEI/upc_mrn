@@ -379,6 +379,7 @@ int FindFrontiers::point2cell(const geometry_msgs::msg::Point &point, const nav_
     int cell = x_cell + (y_cell)*map_.info.width;
     return cell;
 }
+
 geometry_msgs::msg::Point FindFrontiers::cell2point(const int &cell, const nav_msgs::msg::OccupancyGrid &map_) const
 {
     geometry_msgs::msg::Point point;
