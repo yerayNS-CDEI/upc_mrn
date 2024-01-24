@@ -9,7 +9,8 @@ launch:
     default: ""
 - arg:
     name: "world"
-    default: "small" #small, large
+    default: "small"
+    choice: [value: small, value: large]
 - arg:
     name: "algorithm_variant"
     default: ""
@@ -19,6 +20,7 @@ launch:
 - arg:
     name: "gui"
     default: "false"
+    choice: [value: "true", value: "false"]
 
 # include frontiers launch (simulation + SLAM + find_frontiers + navigation)
 - include:
@@ -29,7 +31,7 @@ launch:
     pkg: "upc_mrn"
     exec: "$(var node_name)"
     name: "exploration"
-    params:
+    param:
     - 
       name: "world"
       value: "$(var world)"

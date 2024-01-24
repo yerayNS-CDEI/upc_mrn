@@ -7,6 +7,13 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
 
+ARGUMENTS = [
+    DeclareLaunchArgument('world', default_value='small',
+                          description='Ignition World'),
+    DeclareLaunchArgument('gui', default_value='false',
+                          choices=['true', 'false'],
+                          description='Gazebo GUI enabled')
+]
 def generate_launch_description():
     # Directories
     pkg_upc_mrn = get_package_share_directory(
@@ -21,16 +28,7 @@ def generate_launch_description():
         [pkg_upc_mrn, 'launch', 'nav.launch.py'])
 
     sim = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(sim),
-        launch_arguments=[
-            ('use_sim_time', LaunchConfiguration('use_sim_time')),
-            ('namespace', LaunchConfiguration('namespace')),
-            ('world', LaunchConfiguration('world')),
-            ('x', LaunchConfiguration('x')),
-            ('y', LaunchConfiguration('y')),
-            ('z', LaunchConfiguration('z')),
-            ('yaw', LaunchConfiguration('yaw'))
-        ]
+        PythonLaunchDescriptionSource(sim)
     )
 
     slam = IncludeLaunchDescription(
@@ -51,7 +49,7 @@ def generate_launch_description():
     )
 
     # Create launch description and add actions
-    ld = LaunchDescription()
+    ld = LaunchDescription(ARGUMENTS)
     ld.add_action(sim)
     ld.add_action(slam)
     ld.add_action(nav)

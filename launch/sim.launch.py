@@ -24,6 +24,9 @@ from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 import launch_ros.actions
 
 ARGUMENTS = [
+    DeclareLaunchArgument('use_sim_time', default_value='true',
+                          choices=['true', 'false'],
+                          description='use_sim_time'),
     DeclareLaunchArgument('namespace', default_value='',
                           description='Robot namespace'),
     DeclareLaunchArgument('world', default_value='empty',

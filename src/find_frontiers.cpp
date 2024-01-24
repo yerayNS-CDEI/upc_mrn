@@ -58,7 +58,7 @@ FindFrontiers::FindFrontiers() : Node("find_frontiers"), cell_size_(-1)
     declare_parameter("min_frontier_size", 5); // default 5 cells
     get_parameter("min_frontier_size", min_frontier_size_);
 
-    RCLCPP_INFO(get_logger(), "FindFrontiers constructor! Parameters: min_frontier_size = %d", min_frontier_size_);
+    RCLCPP_DEBUG(get_logger(), "FindFrontiers constructor! Parameters: min_frontier_size = %d", min_frontier_size_);
 
     // publisher and subscribers
     frontiers_pub_ = this->create_publisher<upc_mrn::msg::Frontiers>("/frontiers", 1);
@@ -73,7 +73,7 @@ FindFrontiers::FindFrontiers() : Node("find_frontiers"), cell_size_(-1)
 
 void FindFrontiers::mapCallback(const nav_msgs::msg::OccupancyGrid &msg)
 {
-    RCLCPP_INFO(get_logger(), "map received!");
+    RCLCPP_DEBUG(get_logger(), "map received!");
 
     nav_msgs::msg::OccupancyGrid map_occupancy = msg;
     nav_msgs::msg::OccupancyGrid map_frontiers = msg;
@@ -113,11 +113,11 @@ void FindFrontiers::mapCallback(const nav_msgs::msg::OccupancyGrid &msg)
     }
     // publish map_free
     map_free_pub_->publish(map_free);
-    RCLCPP_INFO(get_logger(), "map free published!");
+    RCLCPP_DEBUG(get_logger(), "map free published!");
 
     // publish map_free
     map_filtered_pub_->publish(map_occupancy);
-    RCLCPP_INFO(get_logger(), "map filtered published!");
+    RCLCPP_DEBUG(get_logger(), "map filtered published!");
 
     // FIND FRONTIERS
     // create map frontiers (assign each cell if it is frontier)
@@ -129,7 +129,7 @@ void FindFrontiers::mapCallback(const nav_msgs::msg::OccupancyGrid &msg)
 
     // publish map_frontiers
     map_frontiers_pub_->publish(map_frontiers);
-    RCLCPP_INFO(get_logger(), "map frontiers published!");
+    RCLCPP_DEBUG(get_logger(), "map frontiers published!");
 
     // Label frontiers (connected cells)
     std::map<int, int> labels_sizes;
@@ -214,9 +214,9 @@ void FindFrontiers::mapCallback(const nav_msgs::msg::OccupancyGrid &msg)
 
     // Publish
     frontiers_pub_->publish(frontiers_msg);
-    RCLCPP_INFO(get_logger(), "frontiers published!");
+    RCLCPP_DEBUG(get_logger(), "frontiers published!");
     publishMarkers(frontiers_msg);
-    RCLCPP_INFO(get_logger(), "marker array published!");
+    RCLCPP_DEBUG(get_logger(), "marker array published!");
 }
 
 // Check if a cell is frontier (free close to unknown)

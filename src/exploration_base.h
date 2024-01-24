@@ -53,6 +53,9 @@ protected:
     rclcpp_action::Client<NavToPose>::SharedPtr nav_to_pose_client_;
     rclcpp_action::Client<ComputePath>::SharedPtr compute_path_client_;
 
+    // Timer
+    rclcpp::TimerBase::SharedPtr timer_;
+
     // tf
     std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
     std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
@@ -137,6 +140,9 @@ ExplorationBase::ExplorationBase(const std::string &_name)
     get_parameter("world", world_);
     declare_parameter("algorithm_variant", "");
     get_parameter("algorithm_variant", algorithm_variant_);
+    int node_period;
+    declare_parameter("node_period_ms", 500);
+    get_parameter("node_period", node_period);
 
     // substitute '~' by home path
     auto found = results_file_.find('~');
@@ -169,6 +175,9 @@ ExplorationBase::ExplorationBase(const std::string &_name)
     // tf listener
     tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
     tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
+
+    // timer to periodically call loop()
+    timer_ = this->create_wall_timer(std::chrono::milliseconds(node_period), std::bind(&MinimalPublisher::loop, this));
 
     // seed for random
     srand((unsigned)time(NULL));

@@ -40,7 +40,7 @@ ARGUMENTS = [
                           description='Turtlebot4 Model'),
     DeclareLaunchArgument('gui', default_value='true',
                           choices=['true', 'false'],
-                          description='Gazebo GUI enabled'),
+                          description='Gazebo GUI enabled')
 ]
 
 
@@ -83,38 +83,28 @@ def generate_launch_description():
     # Paths
     ign_gazebo_launch = PathJoinSubstitution(
         [pkg_ros_ign_gazebo, 'launch', 'ign_gazebo.launch.py'])
-
-    # Ignition gazebo
+    
+    # ignition gazebo
     ignition_gazebo = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([ign_gazebo_launch]),
         launch_arguments=[
-            ('ign_args', [LaunchConfiguration('world'),
-                          '.sdf',
+            ('ign_args', [LaunchConfiguration('world'), '.sdf',
                           ' -v 4',
                           ' -r',
-                          ' --gui-config ',
-                          PathJoinSubstitution(
-                            [pkg_turtlebot4_ignition_bringup,
-                             'gui',
-                             LaunchConfiguration('model'),
-                             'gui.config'])])
+                          ' --gui-config ', PathJoinSubstitution([pkg_turtlebot4_ignition_bringup,
+                                                                  'gui',
+                                                                  LaunchConfiguration('model'),
+                                                                  'gui.config'])])
         ],
         condition=IfCondition(LaunchConfiguration('gui'))
     )
     ignition_gazebo_no_gui = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([ign_gazebo_launch]),
         launch_arguments=[
-            ('ign_args', [LaunchConfiguration('world'),
-                          '.sdf',
-                          ' -s',
-                          ' -r',
+            ('ign_args', [LaunchConfiguration('world'), '.sdf',
                           ' -v 4',
-                          ' --gui-config ',
-                          PathJoinSubstitution(
-                            [pkg_turtlebot4_ignition_bringup,
-                             'gui',
-                             LaunchConfiguration('model'),
-                             'gui.config'])])
+                          ' -s',
+                          ' -r'])
         ],
         condition=UnlessCondition(LaunchConfiguration('gui'))
     )

@@ -2,7 +2,7 @@ launch:
 
 # include turtlebot4 navigation
 - include:
-    file: "$(find-pkg-share turtlebot4_navigation)/launch/nav.launch.py"
+    file: "$(find-pkg-share turtlebot4_navigation)/launch/nav2.launch.py"
     arg:
     -
       name: "params_file"
