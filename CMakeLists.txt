@@ -82,7 +82,6 @@ add_executable(exploration_random src/exploration_random.cpp)
 ament_target_dependencies(exploration_random
                           rclcpp
                           geometry_msgs
-                          nav_msgs
                           nav2_msgs
                           tf2
                           tf2_ros
@@ -93,6 +92,18 @@ ament_target_dependencies(exploration_random
 rosidl_get_typesupport_target(cpp_typesupport_target "${PROJECT_NAME}" "rosidl_typesupport_cpp")
 target_link_libraries(exploration_random "${cpp_typesupport_target}")
 
+# ComputePathClient
+add_executable(compute_path_client src/compute_path_client.cpp)
+ament_target_dependencies(compute_path_client
+                          rclcpp
+                          geometry_msgs
+                          nav2_msgs
+                          tf2
+                          tf2_ros
+                          tf2_geometry_msgs
+                          rclcpp_action
+                          )
+
 # Install nodes
 install(TARGETS
         pub_twist
@@ -101,6 +112,7 @@ install(TARGETS
         safety_node
         find_frontiers
         exploration_random
+        compute_path_client
         DESTINATION lib/${PROJECT_NAME})
 
 # Install folders: launch, urdf, world, rviz

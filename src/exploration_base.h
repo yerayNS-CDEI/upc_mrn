@@ -8,7 +8,6 @@
 #include "rclcpp/rclcpp.hpp"
 #include "nav_msgs/msg/occupancy_grid.hpp"
 #include "upc_mrn/msg/frontiers.hpp"
-#include "nav_msgs/msg/odometry.hpp"
 #include "nav_msgs/msg/path.hpp"
 
 // Action example: https://github.com/ros2/examples/blob/humble/rclcpp/actions/minimal_action_client/member_functions.cpp
@@ -45,7 +44,6 @@ protected:
     // Subscribers/publishers
     rclcpp::Subscription<upc_mrn::msg::Frontiers>::SharedPtr frontiers_sub_;
     rclcpp::Subscription<nav_msgs::msg::OccupancyGrid>::SharedPtr map_sub_;
-    rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_new_pub_;
     nav_msgs::msg::OccupancyGrid map_;
     upc_mrn::msg::Frontiers frontiers_msg_;
 
@@ -459,60 +457,60 @@ geometry_msgs::msg::Point ExplorationBase::getMapCenter() const
 // NAVIGATION FUNCTIONS ////////////////////////////////////////////////////////////////////////////////////////
 bool ExplorationBase::sendGoal(const geometry_msgs::msg::Pose &goal_pose)
 {
-    using namespace std::placeholders;
+    // using namespace std::placeholders;
 
-    if (not nav_to_pose_client_->wait_for_action_server(std::chrono::milliseconds(50)))
-    {
-        RCLCPP_ERROR(this->get_logger(), "Action server not available after waiting");
-        return false;
-    }
+    // if (not nav_to_pose_client_->wait_for_action_server(std::chrono::milliseconds(50)))
+    // {
+    //     RCLCPP_ERROR(this->get_logger(), "Action server not available after waiting");
+    //     return false;
+    // }
 
-    // Fill goal msg
-    nav2_msgs::action::NavigateToPose::Goal goal;
-    goal.pose.header.frame_id = "map";
-    goal.pose.header.stamp = this->now();
-    goal.pose.pose = goal_pose;
+    // // Fill goal msg
+    // nav2_msgs::action::NavigateToPose::Goal goal;
+    // goal.pose.header.frame_id = "map";
+    // goal.pose.header.stamp = this->now();
+    // goal.pose.pose = goal_pose;
 
-    // reset goal stats
-    goal_ = goal_pose;
-    goal_distance_ = -1;
-    goal_time_ = 0;
-    goal_stamp_ = goal.pose.header.stamp;
-    num_goals_sent_++;
+    // // reset goal stats
+    // goal_ = goal_pose;
+    // goal_distance_ = -1;
+    // goal_time_ = 0;
+    // goal_stamp_ = goal.pose.header.stamp;
+    // num_goals_sent_++;
 
-    // print
-    RCLCPP_INFO(this->get_logger(), "ExplorationBase::moveRobot(): Sending Goal #%d: x=%4.2f, y=%4.2f, yaw=%4.2f in frame_id=%s",
-                num_goals_sent_,
-                goal.pose.pose.position.x,
-                goal.pose.pose.position.y,
-                tf2::getYaw(goal.pose.pose.orientation),
-                goal.pose.header.frame_id.c_str());
+    // // print
+    // RCLCPP_INFO(this->get_logger(), "ExplorationBase::moveRobot(): Sending Goal #%d: x=%4.2f, y=%4.2f, yaw=%4.2f in frame_id=%s",
+    //             num_goals_sent_,
+    //             goal.pose.pose.position.x,
+    //             goal.pose.pose.position.y,
+    //             tf2::getYaw(goal.pose.pose.orientation),
+    //             goal.pose.header.frame_id.c_str());
 
-    rclcpp::Duration t = this->now() - begin_exploration_;
-    int elapsed_time_minutes = int(t.seconds()) / 60;
-    int elapsed_time_seconds = int(t.seconds()) % 60;
+    // rclcpp::Duration t = this->now() - begin_exploration_;
+    // int elapsed_time_minutes = int(t.seconds()) / 60;
+    // int elapsed_time_seconds = int(t.seconds()) % 60;
 
-    printf(
-        ">>> Exploration status:\n\tSent %d goals (aborted %d). Distance traveled %.2f m. Angle turned %.1f. "
-        "Duration: %2.2i:%2.2i min. Explored %.2f m^2 (%d cells)\n",
-        num_goals_sent_,
-        num_goals_ko_,
-        distance_traveled_,
-        angle_traveled_,
-        elapsed_time_minutes,
-        elapsed_time_seconds,
-        cells_explored_ * map_.info.resolution * map_.info.resolution,
-        cells_explored_);
+    // printf(
+    //     ">>> Exploration status:\n\tSent %d goals (aborted %d). Distance traveled %.2f m. Angle turned %.1f. "
+    //     "Duration: %2.2i:%2.2i min. Explored %.2f m^2 (%d cells)\n",
+    //     num_goals_sent_,
+    //     num_goals_ko_,
+    //     distance_traveled_,
+    //     angle_traveled_,
+    //     elapsed_time_minutes,
+    //     elapsed_time_seconds,
+    //     cells_explored_ * map_.info.resolution * map_.info.resolution,
+    //     cells_explored_);
 
-    // Send goal
-    auto send_goal_options = rclcpp_action::Client<NavToPose>::SendGoalOptions();
-    send_goal_options.goal_response_callback =
-        std::bind(&ExplorationBase::goalResponseCallback, this, _1);
-    send_goal_options.feedback_callback =
-        std::bind(&ExplorationBase::goalFeedbackCallback, this, _1, _2);
-    send_goal_options.result_callback =
-        std::bind(&ExplorationBase::goalResultCallback, this, _1);
-    nav_to_pose_client_->async_send_goal(goal, send_goal_options);
+    // // Send goal
+    // auto send_goal_options = rclcpp_action::Client<NavToPose>::SendGoalOptions();
+    // send_goal_options.goal_response_callback =
+    //     std::bind(&ExplorationBase::goalResponseCallback, this, _1);
+    // send_goal_options.feedback_callback =
+    //     std::bind(&ExplorationBase::goalFeedbackCallback, this, _1, _2);
+    // send_goal_options.result_callback =
+    //     std::bind(&ExplorationBase::goalResultCallback, this, _1);
+    // nav_to_pose_client_->async_send_goal(goal, send_goal_options);
 
     return true;
 }
@@ -585,7 +583,11 @@ double ExplorationBase::computePathLength(const geometry_msgs::msg::Pose &goal_p
 
     // Wait 50ms for the server to accept the goal
     auto goal_handle_future = compute_path_client_->async_send_goal(goal_msg);
-    // if (goal_handle_future.wait_for(std::chrono::milliseconds(100)) == std::future_status::timeout)
+    RCLCPP_INFO(this->get_logger(), "waiting goal handle future");
+    goal_handle_future.wait();
+    RCLCPP_INFO(this->get_logger(), "handle future available!");
+
+    // if (goal_handle_future.wait_for(std::chrono::milliseconds(1000)) == std::future_status::timeout)
     // {
     //     RCLCPP_ERROR(this->get_logger(), "compute_path_to_pose: send goal call failed :(");
     //     return -1;
