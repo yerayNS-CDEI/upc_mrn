@@ -17,10 +17,6 @@ launch:
 # include simulation 
 - include:
     file: "$(find-pkg-share upc_mrn)/launch/sim.launch.py"
-    arg:
-    -
-      name: "gui"
-      value: "$(var gui)"
 
 # include SLAM 
 - include:

@@ -21,6 +21,10 @@ launch:
     name: "gui"
     default: "false"
     choice: [value: "true", value: "false"]
+- arg:
+    name: "use_sim_time"
+    default: "true"
+    choice: [value: "true", value: "false"]
 
 # include frontiers launch (simulation + SLAM + find_frontiers + navigation)
 - include:
