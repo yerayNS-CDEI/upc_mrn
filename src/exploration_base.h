@@ -41,17 +41,14 @@ protected:
     double goal_time_;                    // seconds since last goal was sent
     double goal_distance_;                // remaining distance to reach the last goal
 
-    // Subscribers/publishers
+    // Subscribers / publishers / actions / timers
+    rclcpp::CallbackGroup::SharedPtr callback_group_;
     rclcpp::Subscription<upc_mrn::msg::Frontiers>::SharedPtr frontiers_sub_;
     rclcpp::Subscription<nav_msgs::msg::OccupancyGrid>::SharedPtr map_sub_;
     nav_msgs::msg::OccupancyGrid map_;
     upc_mrn::msg::Frontiers frontiers_msg_;
-
-    // actions
     rclcpp_action::Client<NavToPose>::SharedPtr nav_to_pose_client_;
     rclcpp_action::Client<ComputePath>::SharedPtr compute_path_client_;
-
-    // Timer
     rclcpp::TimerBase::SharedPtr timer_;
 
     // tf
@@ -125,11 +122,16 @@ ExplorationBase::ExplorationBase(const std::string &_name)
       exploration_started_(false),
       got_map_(false)
 {
+    // Callback group
+    callback_group_ = this->create_callback_group(rclcpp::CallbackGroupType::Reentrant);
+
     // subscribers
+    rclcpp::SubscriptionOptions options;
+    options.callback_group = callback_group_;
     map_sub_ = this->create_subscription<nav_msgs::msg::OccupancyGrid>(
-        "/map", 1, std::bind(&ExplorationBase::mapCallback, this, std::placeholders::_1));
+        "/map", 1, std::bind(&ExplorationBase::mapCallback, this, std::placeholders::_1), options);
     frontiers_sub_ = this->create_subscription<upc_mrn::msg::Frontiers>(
-        "/frontiers", 1, std::bind(&ExplorationBase::frontiersCallback, this, std::placeholders::_1));
+        "/frontiers", 1, std::bind(&ExplorationBase::frontiersCallback, this, std::placeholders::_1), options);
 
     // Get parameters from ROS
     declare_parameter("results_file", "~/exploration_results.csv");
@@ -168,15 +170,15 @@ ExplorationBase::ExplorationBase(const std::string &_name)
     }
 
     // action of nav2
-    nav_to_pose_client_ = rclcpp_action::create_client<NavToPose>(this, "/navigate_to_pose");
-    compute_path_client_ = rclcpp_action::create_client<ComputePath>(this, "/compute_path_to_pose");
+    nav_to_pose_client_ = rclcpp_action::create_client<NavToPose>(this, "/navigate_to_pose", callback_group_);
+    compute_path_client_ = rclcpp_action::create_client<ComputePath>(this, "/compute_path_to_pose", callback_group_);
 
     // tf listener
     tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
     tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
 
     // timer to periodically call loop()
-    timer_ = this->create_wall_timer(std::chrono::milliseconds(node_period), std::bind(&ExplorationBase::loop, this));
+    timer_ = this->create_wall_timer(std::chrono::milliseconds(node_period), std::bind(&ExplorationBase::loop, this), callback_group_);
 
     // seed for random
     srand((unsigned)time(NULL));
@@ -457,60 +459,66 @@ geometry_msgs::msg::Point ExplorationBase::getMapCenter() const
 // NAVIGATION FUNCTIONS ////////////////////////////////////////////////////////////////////////////////////////
 bool ExplorationBase::sendGoal(const geometry_msgs::msg::Pose &goal_pose)
 {
-    // using namespace std::placeholders;
+    using namespace std::placeholders;
 
-    // if (not nav_to_pose_client_->wait_for_action_server(std::chrono::milliseconds(50)))
-    // {
-    //     RCLCPP_ERROR(this->get_logger(), "Action server not available after waiting");
-    //     return false;
-    // }
+    if (not nav_to_pose_client_->wait_for_action_server(std::chrono::milliseconds(50)))
+    {
+        RCLCPP_ERROR(this->get_logger(), "Action server not available after waiting");
+        return false;
+    }
 
-    // // Fill goal msg
-    // nav2_msgs::action::NavigateToPose::Goal goal;
-    // goal.pose.header.frame_id = "map";
-    // goal.pose.header.stamp = this->now();
-    // goal.pose.pose = goal_pose;
+    if (not nav_to_pose_client_->action_server_is_ready())
+    {
+        RCLCPP_ERROR(this->get_logger(), "Action server nav_to_pose_client_ not ready");
+        return false;
+    }
 
-    // // reset goal stats
-    // goal_ = goal_pose;
-    // goal_distance_ = -1;
-    // goal_time_ = 0;
-    // goal_stamp_ = goal.pose.header.stamp;
-    // num_goals_sent_++;
+    // Fill goal msg
+    nav2_msgs::action::NavigateToPose::Goal goal;
+    goal.pose.header.frame_id = "map";
+    goal.pose.header.stamp = this->now();
+    goal.pose.pose = goal_pose;
 
-    // // print
-    // RCLCPP_INFO(this->get_logger(), "ExplorationBase::moveRobot(): Sending Goal #%d: x=%4.2f, y=%4.2f, yaw=%4.2f in frame_id=%s",
-    //             num_goals_sent_,
-    //             goal.pose.pose.position.x,
-    //             goal.pose.pose.position.y,
-    //             tf2::getYaw(goal.pose.pose.orientation),
-    //             goal.pose.header.frame_id.c_str());
+    // reset goal stats
+    goal_ = goal_pose;
+    goal_distance_ = -1;
+    goal_time_ = 0;
+    goal_stamp_ = goal.pose.header.stamp;
+    num_goals_sent_++;
 
-    // rclcpp::Duration t = this->now() - begin_exploration_;
-    // int elapsed_time_minutes = int(t.seconds()) / 60;
-    // int elapsed_time_seconds = int(t.seconds()) % 60;
+    // print
+    RCLCPP_INFO(this->get_logger(), "ExplorationBase::moveRobot(): Sending Goal #%d: x=%4.2f, y=%4.2f, yaw=%4.2f in frame_id=%s",
+                num_goals_sent_,
+                goal.pose.pose.position.x,
+                goal.pose.pose.position.y,
+                tf2::getYaw(goal.pose.pose.orientation),
+                goal.pose.header.frame_id.c_str());
 
-    // printf(
-    //     ">>> Exploration status:\n\tSent %d goals (aborted %d). Distance traveled %.2f m. Angle turned %.1f. "
-    //     "Duration: %2.2i:%2.2i min. Explored %.2f m^2 (%d cells)\n",
-    //     num_goals_sent_,
-    //     num_goals_ko_,
-    //     distance_traveled_,
-    //     angle_traveled_,
-    //     elapsed_time_minutes,
-    //     elapsed_time_seconds,
-    //     cells_explored_ * map_.info.resolution * map_.info.resolution,
-    //     cells_explored_);
+    rclcpp::Duration t = this->now() - begin_exploration_;
+    int elapsed_time_minutes = int(t.seconds()) / 60;
+    int elapsed_time_seconds = int(t.seconds()) % 60;
 
-    // // Send goal
-    // auto send_goal_options = rclcpp_action::Client<NavToPose>::SendGoalOptions();
-    // send_goal_options.goal_response_callback =
-    //     std::bind(&ExplorationBase::goalResponseCallback, this, _1);
-    // send_goal_options.feedback_callback =
-    //     std::bind(&ExplorationBase::goalFeedbackCallback, this, _1, _2);
-    // send_goal_options.result_callback =
-    //     std::bind(&ExplorationBase::goalResultCallback, this, _1);
-    // nav_to_pose_client_->async_send_goal(goal, send_goal_options);
+    printf(
+        ">>> Exploration status:\n\tSent %d goals (aborted %d). Distance traveled %.2f m. Angle turned %.1f. "
+        "Duration: %2.2i:%2.2i min. Explored %.2f m^2 (%d cells)\n",
+        num_goals_sent_,
+        num_goals_ko_,
+        distance_traveled_,
+        angle_traveled_,
+        elapsed_time_minutes,
+        elapsed_time_seconds,
+        cells_explored_ * map_.info.resolution * map_.info.resolution,
+        cells_explored_);
+
+    // Send goal
+    auto send_goal_options = rclcpp_action::Client<NavToPose>::SendGoalOptions();
+    send_goal_options.goal_response_callback =
+        std::bind(&ExplorationBase::goalResponseCallback, this, _1);
+    send_goal_options.feedback_callback =
+        std::bind(&ExplorationBase::goalFeedbackCallback, this, _1, _2);
+    send_goal_options.result_callback =
+        std::bind(&ExplorationBase::goalResultCallback, this, _1);
+    nav_to_pose_client_->async_send_goal(goal, send_goal_options);
 
     return true;
 }
@@ -574,6 +582,12 @@ double ExplorationBase::computePathLength(const geometry_msgs::msg::Pose &goal_p
         return -1;
     }
 
+    if (not compute_path_client_->action_server_is_ready())
+    {
+        RCLCPP_ERROR(this->get_logger(), "Action server compute_path_client_ not ready");
+        return -1;
+    }
+
     // Populate a goal
     RCLCPP_INFO(this->get_logger(), "Sending goal to compute_path_to_pose: x: %f, y: %f", goal_pose.position.x, goal_pose.position.y);
     auto goal_msg = ComputePath::Goal();
@@ -583,15 +597,12 @@ double ExplorationBase::computePathLength(const geometry_msgs::msg::Pose &goal_p
 
     // Wait 50ms for the server to accept the goal
     auto goal_handle_future = compute_path_client_->async_send_goal(goal_msg);
-    RCLCPP_INFO(this->get_logger(), "waiting goal handle future");
-    goal_handle_future.wait();
-    RCLCPP_INFO(this->get_logger(), "handle future available!");
-
-    // if (goal_handle_future.wait_for(std::chrono::milliseconds(1000)) == std::future_status::timeout)
-    // {
-    //     RCLCPP_ERROR(this->get_logger(), "compute_path_to_pose: send goal call failed :(");
-    //     return -1;
-    // }
+    RCLCPP_INFO(this->get_logger(), "compute_path_to_pose: Waiting for goal_handle");
+    if (goal_handle_future.wait_for(std::chrono::milliseconds(1000)) == std::future_status::timeout)
+    {
+        RCLCPP_ERROR(this->get_logger(), "compute_path_to_pose: send goal call failed :(");
+        return -1;
+    }
 
     GoalHandleComputePath::SharedPtr goal_handle = goal_handle_future.get();
     if (!goal_handle)

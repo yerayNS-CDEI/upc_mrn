@@ -52,7 +52,7 @@ geometry_msgs::msg::Pose ExplorationRandom::decideGoal()
   while (not isValidGoal(g, path_length))
     g = generateRandomPose(radius, robot_pose_);
 
-  RCLCPP_INFO(this->get_logger(), "goal decided!");
+  RCLCPP_INFO(this->get_logger(), "goal");
 
   return g;
 }
@@ -62,7 +62,11 @@ geometry_msgs::msg::Pose ExplorationRandom::decideGoal()
 int main(int argc, char *argv[])
 {
   rclcpp::init(argc, argv);
-  rclcpp::spin(std::make_shared<ExplorationRandom>());
-  rclcpp::shutdown();
+
+  auto node = std::make_shared<ExplorationRandom>();
+  rclcpp::executors::MultiThreadedExecutor exec;
+  exec.add_node(node);
+  exec.spin();
+
   return 0;
 }
