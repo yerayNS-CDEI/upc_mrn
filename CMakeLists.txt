@@ -92,17 +92,20 @@ ament_target_dependencies(exploration_random
 rosidl_get_typesupport_target(cpp_typesupport_target "${PROJECT_NAME}" "rosidl_typesupport_cpp")
 target_link_libraries(exploration_random "${cpp_typesupport_target}")
 
-# ComputePathClient
-add_executable(compute_path_client src/compute_path_client.cpp)
-ament_target_dependencies(compute_path_client
+# ExplorationFirstFrontier
+add_executable(exploration_first_frontier src/exploration_first_frontier.cpp)
+ament_target_dependencies(exploration_first_frontier
                           rclcpp
                           geometry_msgs
                           nav2_msgs
                           tf2
                           tf2_ros
                           tf2_geometry_msgs
+                          visualization_msgs
                           rclcpp_action
                           )
+rosidl_get_typesupport_target(cpp_typesupport_target "${PROJECT_NAME}" "rosidl_typesupport_cpp")
+target_link_libraries(exploration_first_frontier "${cpp_typesupport_target}")
 
 # Install nodes
 install(TARGETS
@@ -112,7 +115,7 @@ install(TARGETS
         safety_node
         find_frontiers
         exploration_random
-        compute_path_client
+        exploration_first_frontier
         DESTINATION lib/${PROJECT_NAME})
 
 # Install folders: launch, urdf, world, rviz

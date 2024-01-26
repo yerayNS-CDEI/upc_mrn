@@ -92,7 +92,7 @@ main()
   if ! [ -d ~/${WSNAME}/src/upc_mrn ]; then
     echo " --- Downloading upc_mrn ROS package"
     cd ~/${WSNAME}/src
-    git clone https://gitlab.com/joanvallve/upc_mrn
+    git clone https://gitlab.com/joanvallve/upc_mrn.git
   else
     echo " --- Updating upc_mrn ROS package"
     cd ~/${WSNAME}/src/upc_mrn
