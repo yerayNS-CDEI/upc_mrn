@@ -45,3 +45,7 @@ launch:
     - 
       name: "results_file"
       value: "$(var results_file)"
+    # ADD YOUR PARAMETERS HERE:
+    #- 
+    #  name: "param_2"
+    #  value: 3.5

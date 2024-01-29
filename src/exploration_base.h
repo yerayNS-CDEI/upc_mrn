@@ -39,6 +39,7 @@ protected:
     geometry_msgs::msg::Pose goal_;       // last goal sent
     double goal_time_;                    // seconds since last goal was sent
     double goal_distance_;                // remaining distance to reach the last goal
+    rclcpp_action::GoalUUID goal_id_;     // last goal id
 
     // Subscribers / publishers / actions / timers
     rclcpp::CallbackGroup::SharedPtr callback_group_1_, callback_group_2_;
@@ -534,13 +535,13 @@ void ExplorationBase::goalResponseCallback(const GoalHandleNavToPose::SharedPtr 
         if (!goal_handle)
         {
             RCLCPP_ERROR(this->get_logger(), "Goal was rejected by nav_to_pose action server");
-            robot_status_ = 2; // cancelled
+            //robot_status_ = 2; // cancelled
             num_goals_ko_++;
         }
         else
         {
             RCLCPP_INFO(this->get_logger(), "Goal accepted by nav_to_pose action server, robot is moving! %s", rclcpp_action::to_string(goal_handle->get_goal_id()).c_str());
-            
+            goal_id_ = goal_handle->get_goal_id();
             robot_status_ = 0; // moving
         }
     }
@@ -570,6 +571,9 @@ void ExplorationBase::goalResultCallback(const GoalHandleNavToPose::WrappedResul
 {
     try
     {
+        if (result.goal_id != goal_id_)
+            return;
+            
         RCLCPP_INFO(this->get_logger(), "Received result from nav_to_pose action");
 
         switch (result.code)
@@ -579,10 +583,10 @@ void ExplorationBase::goalResultCallback(const GoalHandleNavToPose::WrappedResul
             robot_status_ = 1; // reached
             return;
         case rclcpp_action::ResultCode::ABORTED:
-            RCLCPP_ERROR(this->get_logger(), "Result from nav_to_pose: Goal was aborted: %s", rclcpp_action::to_string(result.goal_id).c_str());
+            RCLCPP_WARN(this->get_logger(), "Result from nav_to_pose: Goal was aborted: %s", rclcpp_action::to_string(result.goal_id).c_str());
             break;
         case rclcpp_action::ResultCode::CANCELED:
-            RCLCPP_ERROR(this->get_logger(), "Result from nav_to_pose: Goal was canceled: %s", rclcpp_action::to_string(result.goal_id).c_str());
+            RCLCPP_WARN(this->get_logger(), "Result from nav_to_pose: Goal was canceled: %s", rclcpp_action::to_string(result.goal_id).c_str());
             break;
         default:
             RCLCPP_ERROR(this->get_logger(), "Result from nav_to_pose: Unknown result code: %s", rclcpp_action::to_string(result.goal_id).c_str());
