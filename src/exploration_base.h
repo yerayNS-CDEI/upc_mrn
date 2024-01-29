@@ -10,7 +10,6 @@
 #include "upc_mrn/msg/frontiers.hpp"
 #include "nav_msgs/msg/path.hpp"
 
-// Action example: https://github.com/ros2/examples/blob/humble/rclcpp/actions/minimal_action_client/member_functions.cpp
 #include "rclcpp_action/rclcpp_action.hpp"
 #include "nav2_msgs/action/navigate_to_pose.hpp"
 #include "nav2_msgs/action/compute_path_to_pose.hpp"
@@ -122,7 +121,7 @@ ExplorationBase::ExplorationBase(const std::string &_name)
       exploration_started_(false),
       got_map_(false)
 {
-    // Callback group
+    // Callback groups
     callback_group_1_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
     callback_group_2_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
 
@@ -135,15 +134,11 @@ ExplorationBase::ExplorationBase(const std::string &_name)
         "/frontiers", 1, std::bind(&ExplorationBase::frontiersCallback, this, std::placeholders::_1), options);
 
     // Get parameters from ROS
-    declare_parameter("results_file", "~/exploration_results.csv");
-    get_parameter("results_file", results_file_);
-    declare_parameter("world", "undefined");
-    get_parameter("world", world_);
-    declare_parameter("algorithm_variant", "");
-    get_parameter("algorithm_variant", algorithm_variant_);
     int node_period;
-    declare_parameter("node_period_ms", 500);
-    get_parameter("node_period_ms", node_period);
+    get_parameter_or("results_file", results_file_, std::string("~/exploration_results.csv"));
+    get_parameter_or("world", world_, std::string("undefined"));
+    get_parameter_or("algorithm_variant", algorithm_variant_, std::string());
+    get_parameter_or("node_period_ms", node_period, 500);
 
     // substitute '~' by home path
     auto found = results_file_.find('~');
@@ -159,8 +154,7 @@ ExplorationBase::ExplorationBase(const std::string &_name)
     }
 
     // check that file can be opened
-    std::ofstream outfile(results_file_,
-                          std::ofstream::out | std::ofstream::app); // append instead of overwrite
+    std::ofstream outfile(results_file_, std::ofstream::out | std::ofstream::app); // append instead of overwrite
     if (not outfile.is_open())
     {
         RCLCPP_ERROR(this->get_logger(), "ExplorationBase: couldn't open/write the results file %s\n", results_file_.c_str());
@@ -249,8 +243,7 @@ geometry_msgs::msg::Pose ExplorationBase::decideGoalBase()
 
 void ExplorationBase::loop()
 {
-    RCLCPP_DEBUG(this->get_logger(), "ExplorationBase::loop");
-    RCLCPP_INFO(this->get_logger(), "ExplorationBase::loop(): goal_time: %f, goal_distance=%f", goal_time_, goal_distance_);
+    RCLCPP_DEBUG(this->get_logger(), "ExplorationBase::loop(): goal_time: %f, goal_distance=%f", goal_time_, goal_distance_);
 
     // NOT STARTED
     if (not exploration_started_ || not got_map_)
@@ -350,8 +343,6 @@ geometry_msgs::msg::Pose ExplorationBase::generateRandomPose(float radius, geome
 {
     RCLCPP_INFO(this->get_logger(), "ExplorationBase::generateRandomPose");
 
-    geometry_msgs::msg::Pose goal_pose;
-
     if (radius <= 0)
     {
         RCLCPP_WARN(this->get_logger(), "ExplorationBase::generateRandomPose(): radius must be > 0. Changed to 1");
@@ -377,6 +368,7 @@ geometry_msgs::msg::Pose ExplorationBase::generateRandomPose(float radius, geome
     float rand_r = radius * (rand() % 100) / 100.0;
 
     // Compose over reference pose
+    geometry_msgs::msg::Pose goal_pose;
     goal_pose.position.x = reference_pose.position.x + rand_r * cos(rand_yaw);
     goal_pose.position.y = reference_pose.position.y + rand_r * sin(rand_yaw);
     tf2::Quaternion q;
@@ -391,8 +383,7 @@ bool ExplorationBase::isValidGoal(const geometry_msgs::msg::Pose &goal, double &
     // not free (also returning false if out of map)
     if (not isFree(goal.position))
     {
-        RCLCPP_WARN(this->get_logger(),
-                    "ExplorationBase::isValidGoal(): Goal is not free or not inside the map");
+        RCLCPP_WARN(this->get_logger(), "ExplorationBase::isValidGoal(): Goal is not free or not inside the map");
         return false;
     }
     // return true if a path to that pose could be computed
@@ -400,8 +391,7 @@ bool ExplorationBase::isValidGoal(const geometry_msgs::msg::Pose &goal, double &
 
     if (path_length < 0)
     {
-        RCLCPP_WARN(this->get_logger(),
-                    "ExplorationBase::isValidGoal(): computePathLength provided negative path lenght");
+        RCLCPP_WARN(this->get_logger(), "ExplorationBase::isValidGoal(): computePathLength() provided negative path lenght");
     }
     return path_length >= 0;
 }
@@ -478,7 +468,7 @@ bool ExplorationBase::sendGoal(const geometry_msgs::msg::Pose &goal_pose)
         goal.pose.header.frame_id = "map";
         goal.pose.header.stamp = this->now();
         goal.pose.pose = goal_pose;
-        
+
         // reset goal stats
         goal_ = goal_pose;
         goal_distance_ = -1;
@@ -535,7 +525,7 @@ void ExplorationBase::goalResponseCallback(const GoalHandleNavToPose::SharedPtr 
         if (!goal_handle)
         {
             RCLCPP_ERROR(this->get_logger(), "Goal was rejected by nav_to_pose action server");
-            //robot_status_ = 2; // cancelled
+            // robot_status_ = 2; // cancelled
             num_goals_ko_++;
         }
         else
@@ -556,6 +546,9 @@ void ExplorationBase::goalFeedbackCallback(const GoalHandleNavToPose::SharedPtr 
 {
     try
     {
+        if (goal_handle->get_goal_id() != goal_id_)
+            return;
+
         RCLCPP_DEBUG(this->get_logger(), "Received feedback from nav_to_pose action");
 
         goal_distance_ = feedback->distance_remaining;
@@ -573,7 +566,7 @@ void ExplorationBase::goalResultCallback(const GoalHandleNavToPose::WrappedResul
     {
         if (result.goal_id != goal_id_)
             return;
-            
+
         RCLCPP_INFO(this->get_logger(), "Received result from nav_to_pose action");
 
         switch (result.code)

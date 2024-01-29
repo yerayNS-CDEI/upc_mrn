@@ -298,7 +298,7 @@ std::vector<int> FindFrontiers::twoPassLabeling(const nav_msgs::msg::OccupancyGr
 void FindFrontiers::publishMarkers(const upc_mrn::msg::Frontiers &frontiers_msg)
 {
     // resize
-    markers_.markers.resize(frontiers_msg.frontiers.size() * 3 + 1); // each frontier: cells_points, center_point i text
+    markers_.markers.resize(frontiers_msg.frontiers.size() * 3 + 1); // each frontier: cells, center_point and text
 
     // deleteall
     markers_.markers[0].action = visualization_msgs::msg::Marker::DELETEALL;
@@ -357,7 +357,7 @@ void FindFrontiers::publishMarkers(const upc_mrn::msg::Frontiers &frontiers_msg)
         marker_id.color = c;
         marker_id.pose = marker_center.pose;
         marker_id.pose.position.z = marker_center.scale.z + 0.2;
-        marker_id.ns = "ids";
+        marker_id.ns = "id";
         marker_id.id = 3 * i + 2;
         markers_.markers[3 * i + 3] = marker_id;
     }

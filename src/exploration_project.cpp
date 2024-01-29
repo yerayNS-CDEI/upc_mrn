@@ -1,6 +1,6 @@
 #include "exploration_base.h"
 
-class ExplorationClosestFrontier : public ExplorationBase
+class ExplorationProject : public ExplorationBase
 {
   protected:
     //////////////////////////////////////////////////////////////////////
@@ -16,14 +16,14 @@ class ExplorationClosestFrontier : public ExplorationBase
     //////////////////////////////////////////////////////////////////////
 
   public:
-    ExplorationClosestFrontier();
+    ExplorationProject();
 
   protected:
     bool                replan() override;
     geometry_msgs::msg::Pose decideGoal() override;
 };
 
-ExplorationClosestFrontier::ExplorationClosestFrontier() : ExplorationBase("exploration_closest_frontier")
+ExplorationProject::ExplorationProject() : ExplorationBase("exploration_project")
 {
     //////////////////////////////////////////////////////////////////////
     // TODO 1b: You can set the value of attributes using ros param
@@ -40,7 +40,7 @@ ExplorationClosestFrontier::ExplorationClosestFrontier() : ExplorationBase("expl
     //////////////////////////////////////////////////////////////////////
 }
 
-geometry_msgs::msg::Pose ExplorationClosestFrontier::decideGoal()
+geometry_msgs::msg::Pose ExplorationProject::decideGoal()
 {
     geometry_msgs::msg::Pose g;
 
@@ -77,7 +77,7 @@ geometry_msgs::msg::Pose ExplorationClosestFrontier::decideGoal()
     return g;
 }
 
-bool ExplorationClosestFrontier::replan()
+bool ExplorationProject::replan()
 {
     // REMEMBER:
     // goal_time_ has the time since last goal was sent (seconds)
@@ -102,7 +102,7 @@ int main(int argc, char *argv[])
 {
   rclcpp::init(argc, argv);
   rclcpp::executors::MultiThreadedExecutor exec;
-  auto node = std::make_shared<ExplorationClosestFrontier>();
+  auto node = std::make_shared<ExplorationProject>();
   exec.add_node(node);
   exec.spin();
 

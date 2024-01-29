@@ -8,7 +8,7 @@ class ExplorationBiggestFrontier : public ExplorationBase
     //          methods (functions), define them HERE
     //////////////////////////////////////////////////////////////////////
 
-    // EXAMPLE ATTRIBUTE:
+    // // EXAMPLE ATTRIBUTE:
     // double time_max_goal_; // max time to reach a goal before aborting
 
     //////////////////////////////////////////////////////////////////////
@@ -16,60 +16,57 @@ class ExplorationBiggestFrontier : public ExplorationBase
     //////////////////////////////////////////////////////////////////////
 
   public:
-    ExplorationBiggestFrontier(ros::NodeHandle& nh);
+    ExplorationBiggestFrontier();
 
   protected:
     bool                replan() override;
-    geometry_msgs::Pose decideGoal() override;
+    geometry_msgs::msg::Pose decideGoal() override;
 };
 
-ExplorationBiggestFrontier::ExplorationBiggestFrontier(ros::NodeHandle& nh) : ExplorationBase(nh)
+ExplorationBiggestFrontier::ExplorationBiggestFrontier() : ExplorationBase("exploration_biggest_frontier")
 {
-    alg_name_ = "exploration_biggest_frontier";
-
     //////////////////////////////////////////////////////////////////////
     // TODO 1b: You can set the value of attributes using ros param
     //          for changing the value without need of recompiling.
     //////////////////////////////////////////////////////////////////////
 
-    // EXAMPLE FOR LOADING PARAMS TO YOUR ATTRIBUTES:
-    // Set the attribute 'time_max_goal_' the value of param "time_max_goal" if defined,
-    // otherwise, it is set to 20.
-    // nh_.param<double>("time_max_goal", time_max_goal_, 20);
+    // // EXAMPLE FOR LOADING PARAMS TO YOUR ATTRIBUTES:
+    // // Get the value of the param "time_max_goal" and store it to the attribute 'time_max_goal_'.
+    // // If the parameters is not defined, use the default value 20:
+    // get_parameter_or("time_max_goal", time_max_goal_, 20);
 
     //////////////////////////////////////////////////////////////////////
     // TODO 1b END
     //////////////////////////////////////////////////////////////////////
 }
 
-geometry_msgs::Pose ExplorationBiggestFrontier::decideGoal()
+geometry_msgs::msg::Pose ExplorationBiggestFrontier::decideGoal()
 {
-    geometry_msgs::Pose g;
+    geometry_msgs::msg::Pose g;
 
     ////////////////////////////////////////////////////////////////////
     // TODO 2: decide goal
     ////////////////////////////////////////////////////////////////////
 
-    // EXAMPLE iterating over detected frontiers
-    // for (int i = 0; i < frontiers_msg_.frontiers.size(); i++)
+    // // EXAMPLE iterating over detected frontiers
+    // for (unsigned int i = 0; i < frontiers_msg_.frontiers.size(); i++)
     // {
     //   // Accessing different fields
-    //   frontiers_msg_.frontiers[i].id;
     //   frontiers_msg_.frontiers[i].size;
-    //   frontiers_msg_.frontiers[i].center_free_point.x;
-    //   frontiers_msg_.frontiers[i].center_free_point.y;
-    //   frontiers_msg_.frontiers[i].center_free_point.z;
+    //   frontiers_msg_.frontiers[i].center_point.x;
+    //   frontiers_msg_.frontiers[i].center_point.y;
+    //   frontiers_msg_.frontiers[i].center_point.z;
     // }
 
-    // EXAMPLE filling Pose message
-    // The goal position can be filled with the center_free_point of the "best" frontier
+    // // EXAMPLE filling Pose message
+    // // The goal position can be filled with the center_point of the "best" frontier
     // g.position = frontiers_msg_.frontiers[i_best].center_free_point;
     //
-    // The orientation has to be filled as well.
+    // // The orientation has to be filled as well.
     // g.orientation = robot_pose_.orientation;             // EXAMPLE1: the same orientation as the current one
-    // g.orientation = tf::createQuaternionMsgFromYaw(0.0); // EXAMPLE2: zero theta
+    // g.orientation = tf::createQuaternionMsgFromYaw(0.0); // EXAMPLE2: zero yaw
 
-    // EXAMPLE check if a goal is valid and get path length to the goal
+    // // EXAMPLE check if a goal is valid and get path length to the goal
     // double path_length;
     // bool valid = isValidGoal(g, path_length)
 
@@ -82,12 +79,9 @@ geometry_msgs::Pose ExplorationBiggestFrontier::decideGoal()
 
 bool ExplorationBiggestFrontier::replan()
 {
-    // EXAMPLES:
-    // Compute time since last goal was sent
-    // double dt_last_goal = (ros::Time::now() - time_target_goal_).toSec();
-    // Compute distance to goal
-    // double dist_goal = std::sqrt(std::pow(target_goal_.position.x-robot_pose_.position.x,2)
-    //                             +std::pow(target_goal_.position.y-robot_pose_.position.y,2));
+    // REMEMBER:
+    // goal_time_ has the time since last goal was sent (seconds)
+    // goal_distance_ has remaining distance to reach the last goal (meters)
 
     ////////////////////////////////////////////////////////////////////
     // TODO 3: replan
@@ -104,19 +98,13 @@ bool ExplorationBiggestFrontier::replan()
 }
 
 ////// MAIN ////////////////////////////////////////////////////////////////////////////
-int main(int argc, char** argv)
+int main(int argc, char *argv[])
 {
-    ros::init(argc, argv, "exploration_biggest_frontier_node");
-    ros::NodeHandle            nh("~");
-    ExplorationBiggestFrontier node_exploration(nh);
-    ros::Rate                  loop_rate(10);
+  rclcpp::init(argc, argv);
+  rclcpp::executors::MultiThreadedExecutor exec;
+  auto node = std::make_shared<ExplorationBiggestFrontier>();
+  exec.add_node(node);
+  exec.spin();
 
-    while (ros::ok())
-    {
-        ros::spinOnce();
-        loop_rate.sleep();
-
-        node_exploration.loop();
-    }
-    return 0;
+  return 0;
 }

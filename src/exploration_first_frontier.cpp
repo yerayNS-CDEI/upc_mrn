@@ -16,10 +16,8 @@ protected:
 ExporationFirstFrontier::ExporationFirstFrontier() : ExplorationBase("exploration_first_frontier")
 {
     // Load parameters from ROS params
-    declare_parameter("dt_replan", 2.0); // default 20s
-    get_parameter("dt_replan", dt_replan_);
-    declare_parameter("dist_goal_th", 0.2); // default 0.2m
-    get_parameter("dist_goal_th", dist_goal_th_);
+    get_parameter_or("dt_replan", dt_replan_, 3.0); // default 3s
+    get_parameter_or("dist_goal_th", dist_goal_th_, 0.3); // default 0.3m
 }
 
 geometry_msgs::msg::Pose ExporationFirstFrontier::decideGoal()
@@ -70,9 +68,8 @@ bool ExporationFirstFrontier::replan()
 int main(int argc, char *argv[])
 {
   rclcpp::init(argc, argv);
-
-  auto node = std::make_shared<ExporationFirstFrontier>();
   rclcpp::executors::MultiThreadedExecutor exec;
+  auto node = std::make_shared<ExporationFirstFrontier>();
   exec.add_node(node);
   exec.spin();
 

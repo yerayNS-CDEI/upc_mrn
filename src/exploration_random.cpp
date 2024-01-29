@@ -16,8 +16,7 @@ protected:
 ExplorationRandom::ExplorationRandom() : ExplorationBase("exploration_random")
 {
   // Load parameters from ROS params
-  declare_parameter("goal_dist_threshold", 0.1); // default 0.1m
-  get_parameter("goal_dist_threshold", goal_dist_threshold_);
+  get_parameter_or("goal_dist_threshold", goal_dist_threshold_, 0.5); // default 0.5m;
 
   // Start exploration
   exploration_started_ = true;
@@ -52,13 +51,11 @@ geometry_msgs::msg::Pose ExplorationRandom::decideGoal()
 }
 
 ////// MAIN ////////////////////////////////////////////////////////////////////////////
-
 int main(int argc, char *argv[])
 {
   rclcpp::init(argc, argv);
-
-  auto node = std::make_shared<ExplorationRandom>();
   rclcpp::executors::MultiThreadedExecutor exec;
+  auto node = std::make_shared<ExplorationRandom>();
   exec.add_node(node);
   exec.spin();
 

@@ -34,6 +34,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
                            std_msgs
 )
 ament_export_dependencies(rosidl_default_runtime)
+rosidl_get_typesupport_target(cpp_typesupport_target "${PROJECT_NAME}" "rosidl_typesupport_cpp")
 
 # PubTwist
 add_executable(pub_twist src/pub_twist.cpp)
@@ -74,38 +75,61 @@ ament_target_dependencies(find_frontiers
                           geometry_msgs
                           nav_msgs
                           visualization_msgs)
-rosidl_get_typesupport_target(cpp_typesupport_target "${PROJECT_NAME}" "rosidl_typesupport_cpp")
 target_link_libraries(find_frontiers "${cpp_typesupport_target}")
 
 # ExplorationRandom
 add_executable(exploration_random src/exploration_random.cpp)
 ament_target_dependencies(exploration_random
-                          rclcpp
-                          geometry_msgs
-                          nav2_msgs
-                          tf2
-                          tf2_ros
-                          tf2_geometry_msgs
-                          visualization_msgs
-                          rclcpp_action
+                          rclcpp rclcpp_action
+                          geometry_msgs nav2_msgs
+                          tf2 tf2_ros tf2_geometry_msgs
                           )
-rosidl_get_typesupport_target(cpp_typesupport_target "${PROJECT_NAME}" "rosidl_typesupport_cpp")
 target_link_libraries(exploration_random "${cpp_typesupport_target}")
 
 # ExplorationFirstFrontier
 add_executable(exploration_first_frontier src/exploration_first_frontier.cpp)
 ament_target_dependencies(exploration_first_frontier
-                          rclcpp
-                          geometry_msgs
-                          nav2_msgs
-                          tf2
-                          tf2_ros
-                          tf2_geometry_msgs
-                          visualization_msgs
-                          rclcpp_action
+                          rclcpp rclcpp_action
+                          geometry_msgs nav2_msgs
+                          tf2 tf2_ros tf2_geometry_msgs
                           )
-rosidl_get_typesupport_target(cpp_typesupport_target "${PROJECT_NAME}" "rosidl_typesupport_cpp")
 target_link_libraries(exploration_first_frontier "${cpp_typesupport_target}")
+
+# ExplorationClosestFrontier
+add_executable(exploration_closest_frontier src/exploration_closest_frontier.cpp)
+ament_target_dependencies(exploration_closest_frontier
+                          rclcpp rclcpp_action
+                          geometry_msgs nav2_msgs
+                          tf2 tf2_ros tf2_geometry_msgs
+                          )
+target_link_libraries(exploration_closest_frontier "${cpp_typesupport_target}")
+
+# ExplorationBiggestFrontier
+add_executable(exploration_biggest_frontier src/exploration_biggest_frontier.cpp)
+ament_target_dependencies(exploration_biggest_frontier
+                          rclcpp rclcpp_action
+                          geometry_msgs nav2_msgs
+                          tf2 tf2_ros tf2_geometry_msgs
+                          )
+target_link_libraries(exploration_biggest_frontier "${cpp_typesupport_target}")
+
+# ExplorationProject
+add_executable(exploration_project src/exploration_project.cpp)
+ament_target_dependencies(exploration_project
+                          rclcpp rclcpp_action
+                          geometry_msgs nav2_msgs
+                          tf2 tf2_ros tf2_geometry_msgs
+                          )
+target_link_libraries(exploration_project "${cpp_typesupport_target}")
+
+# # ExplorationProject2
+# add_executable(exploration_project2 src/exploration_project2.cpp)
+# ament_target_dependencies(exploration_project2
+#                           rclcpp rclcpp_action
+#                           geometry_msgs nav2_msgs
+#                           tf2 tf2_ros tf2_geometry_msgs
+#                           )
+# target_link_libraries(exploration_project2 "${cpp_typesupport_target}")
 
 # Install nodes
 install(TARGETS
@@ -116,6 +140,10 @@ install(TARGETS
         find_frontiers
         exploration_random
         exploration_first_frontier
+        exploration_closest_frontier
+        exploration_biggest_frontier
+        exploration_project
+        # exploration_project2
         DESTINATION lib/${PROJECT_NAME})
 
 # Install folders: launch, urdf, world, rviz
