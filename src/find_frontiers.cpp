@@ -55,17 +55,14 @@ private:
 FindFrontiers::FindFrontiers() : Node("find_frontiers"), cell_size_(-1)
 {
     // Declare & load parameter with default values
-    declare_parameter("min_frontier_size", 5); // default 5 cells
-    get_parameter("min_frontier_size", min_frontier_size_);
-
-    RCLCPP_DEBUG(get_logger(), "FindFrontiers constructor! Parameters: min_frontier_size = %d", min_frontier_size_);
+    get_parameter_or("min_frontier_size", min_frontier_size_, 5); // default 5 cells
 
     // publisher and subscribers
     frontiers_pub_ = this->create_publisher<upc_mrn::msg::Frontiers>("/frontiers", 1);
     map_frontiers_pub_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>("map_frontiers", 1);
     map_free_pub_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>("map_free", 1);
     map_filtered_pub_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>("map_filtered", 1);
-    markers_pub_ = this->create_publisher<visualization_msgs::msg::MarkerArray>("markers", 1);
+    markers_pub_ = this->create_publisher<visualization_msgs::msg::MarkerArray>("frontiers_markers", 1);
 
     map_sub_ = this->create_subscription<nav_msgs::msg::OccupancyGrid>(
         "/map", 1, std::bind(&FindFrontiers::mapCallback, this, std::placeholders::_1));
@@ -73,7 +70,7 @@ FindFrontiers::FindFrontiers() : Node("find_frontiers"), cell_size_(-1)
 
 void FindFrontiers::mapCallback(const nav_msgs::msg::OccupancyGrid &msg)
 {
-    RCLCPP_DEBUG(get_logger(), "map received!");
+    RCLCPP_DEBUG(this->get_logger(), "map received!");
 
     nav_msgs::msg::OccupancyGrid map_occupancy = msg;
     nav_msgs::msg::OccupancyGrid map_frontiers = msg;
@@ -113,11 +110,11 @@ void FindFrontiers::mapCallback(const nav_msgs::msg::OccupancyGrid &msg)
     }
     // publish map_free
     map_free_pub_->publish(map_free);
-    RCLCPP_DEBUG(get_logger(), "map free published!");
+    RCLCPP_DEBUG(this->get_logger(), "map free published!");
 
     // publish map_free
     map_filtered_pub_->publish(map_occupancy);
-    RCLCPP_DEBUG(get_logger(), "map filtered published!");
+    RCLCPP_DEBUG(this->get_logger(), "map filtered published!");
 
     // FIND FRONTIERS
     // create map frontiers (assign each cell if it is frontier)
@@ -129,7 +126,7 @@ void FindFrontiers::mapCallback(const nav_msgs::msg::OccupancyGrid &msg)
 
     // publish map_frontiers
     map_frontiers_pub_->publish(map_frontiers);
-    RCLCPP_DEBUG(get_logger(), "map frontiers published!");
+    RCLCPP_DEBUG(this->get_logger(), "map frontiers published!");
 
     // Label frontiers (connected cells)
     std::map<int, int> labels_sizes;
@@ -214,9 +211,9 @@ void FindFrontiers::mapCallback(const nav_msgs::msg::OccupancyGrid &msg)
 
     // Publish
     frontiers_pub_->publish(frontiers_msg);
-    RCLCPP_DEBUG(get_logger(), "frontiers published!");
+    RCLCPP_DEBUG(this->get_logger(), "frontiers published!");
     publishMarkers(frontiers_msg);
-    RCLCPP_DEBUG(get_logger(), "marker array published!");
+    RCLCPP_DEBUG(this->get_logger(), "marker array published!");
 }
 
 // Check if a cell is frontier (free close to unknown)
@@ -307,16 +304,37 @@ void FindFrontiers::publishMarkers(const upc_mrn::msg::Frontiers &frontiers_msg)
     for (unsigned int i = 0; i < frontiers_msg.frontiers.size(); i++)
     {
         std_msgs::msg::ColorRGBA c;
+        double x = (double) i / (double) frontiers_msg.frontiers.size();
         c.a = 1.0;
-        c.r = sin(i * 0.3);
-        c.g = sin(i * 0.3 + 2 * M_PI / 3);
-        c.b = sin(i * 0.3 + 4 * M_PI / 3);
+        c.r = x < 0.33 ? 1 - 0.33 * x : (x < 0.66 ? 0 : 3 * (x - 0.66));
+        c.g = x < 0.33 ? 3 * x : (x < 0.66 ? 1 - 0.33 * (x - 0.33) : 0);
+        c.b = x < 0.33 ? 0 : (x < 0.66 ? 3 * (x - 0.33) : 1 - 0.33 * (x - 0.66));
 
-        // points
+        // RCLCPP_INFO(this->get_logger(), "Colors: i = %u\nx = %f\nr = %f\ng = %f\nb = %f", i, x, c.r, c.g, c.b);
+
+        // point center
+        visualization_msgs::msg::Marker marker_center;
+        marker_center.header.frame_id = frontiers_msg.header.frame_id;
+        marker_center.header.stamp = this->now();
+        marker_center.lifetime = rclcpp::Duration(0, 0);
+        marker_center.type = visualization_msgs::msg::Marker::CYLINDER;
+        marker_center.scale.x = marker_center.scale.y = 0.1;
+        marker_center.scale.z = 0.5;
+        marker_center.color = c;
+        marker_center.ns = "centers";
+        marker_center.id = 3 * i;
+        marker_center.pose.position.x = frontiers_msg.frontiers[i].center_point.x;
+        marker_center.pose.position.y = frontiers_msg.frontiers[i].center_point.y;
+        marker_center.pose.position.z = marker_center.scale.z / 2;
+        marker_center.pose.orientation.x = marker_center.pose.orientation.y = marker_center.pose.orientation.z = 0;
+        marker_center.pose.orientation.w = 1;
+        markers_.markers[3 * i + 1] = marker_center;
+
+        // cells
         visualization_msgs::msg::Marker marker_points;
         marker_points.header.frame_id = frontiers_msg.header.frame_id;
         marker_points.header.stamp = this->now();
-        marker_points.lifetime = rclcpp::Duration(0,0);
+        marker_points.lifetime = rclcpp::Duration(0, 0);
         marker_points.type = visualization_msgs::msg::Marker::POINTS;
         marker_points.pose.orientation.x = marker_points.pose.orientation.y = marker_points.pose.orientation.z = 0;
         marker_points.pose.orientation.w = 1;
@@ -324,32 +342,14 @@ void FindFrontiers::publishMarkers(const upc_mrn::msg::Frontiers &frontiers_msg)
         marker_points.scale.x = marker_points.scale.y = marker_points.scale.z = cell_size_;
         marker_points.colors = std::vector<std_msgs::msg::ColorRGBA>(marker_points.points.size(), c);
         marker_points.ns = "cells";
-        marker_points.id = 3 * i;
-        markers_.markers[3 * i + 1] = marker_points;
-
-        // point center
-        visualization_msgs::msg::Marker marker_center;
-        marker_center.header.frame_id = frontiers_msg.header.frame_id;
-        marker_center.header.stamp = this->now();
-        marker_center.lifetime = rclcpp::Duration(0,0);
-        marker_center.type = visualization_msgs::msg::Marker::CYLINDER;
-        marker_center.scale.x = marker_center.scale.y = 0.1;
-        marker_center.scale.z = 0.5;
-        marker_center.color = c;
-        marker_center.ns = "centers";
-        marker_center.id = 3 * i + 1;
-        marker_center.pose.position.x = frontiers_msg.frontiers[i].center_point.x;
-        marker_center.pose.position.y = frontiers_msg.frontiers[i].center_point.y;
-        marker_center.pose.position.z = marker_center.scale.z / 2;
-        marker_center.pose.orientation.x = marker_center.pose.orientation.y = marker_center.pose.orientation.z = 0;
-        marker_center.pose.orientation.w = 1;
-        markers_.markers[3 * i + 2] = marker_center;
+        marker_points.id = 3 * i + 1;
+        markers_.markers[3 * i + 2] = marker_points;
 
         // text
         visualization_msgs::msg::Marker marker_id;
         marker_id.header.frame_id = frontiers_msg.header.frame_id;
         marker_id.header.stamp = this->now();
-        marker_id.lifetime = rclcpp::Duration(0,0);
+        marker_id.lifetime = rclcpp::Duration(0, 0);
         marker_id.type = visualization_msgs::msg::Marker::TEXT_VIEW_FACING;
         marker_id.scale.x = marker_id.scale.y = 1;
         marker_id.scale.z = 0.5;
@@ -473,8 +473,8 @@ int FindFrontiers::floor0(const float &value) const
 
 int main(int argc, char *argv[])
 {
-  rclcpp::init(argc, argv);
-  rclcpp::spin(std::make_shared<FindFrontiers>());
-  rclcpp::shutdown();
-  return 0;
+    rclcpp::init(argc, argv);
+    rclcpp::spin(std::make_shared<FindFrontiers>());
+    rclcpp::shutdown();
+    return 0;
 }
