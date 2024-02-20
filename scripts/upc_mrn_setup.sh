@@ -2,26 +2,12 @@
 
 main()
 {
-  echo " --- [ UPC_MRN_SETUP script ] ---" 
+  echo " --- [ UPC_MRN_SETUP script for ETSEIB PCs] ---" 
 
   # This script creates a ROS2 workspace with the package upc_mrn
   
-  WSNAME="ros2_ws"
-
-  ## check if is sudoer
-  if ! $(sudo mkdir test_folder &> /dev/null); then
-    echo 'User has no root privileges'
-    SUDOER=false
-  else
-    echo 'User has root privileges'
-    sudo rm -rf test_folder
-    if [ "$UID" -eq 0 -o "$EUID" -eq 0 ]; then
-      SUDO=false
-    else
-      SUDO=true
-    fi
-    SUDOER=true
-  fi
+  WSPATH="~/data/ros2_ws"
+  BASHFILE="~/data/bashrc.d"
   
   #######################Logging#######################
   DEST=${BASH_SOURCE[0]}
@@ -46,107 +32,59 @@ main()
   fi
 
   #################################################################
-  ###INSTALL ADDITIONAL PACKAGES
-  
-  if [ $SUDOER == "true" ]; then
-    echo " --- Update apt"
-    if [ $SUDO == "true" ]; then
-      sudo apt-get update &>> ${REDIRECTION} || echo "###ERROR, for more info check log file: $LOGDIR/$FILENAME.log"
-    else
-      apt-get install update &>> ${REDIRECTION} || echo "###ERROR, for more info check log file: $LOGDIR/$FILENAME.log"
-    fi
-
-    echo " --- Installing extra packages"
-    add_apt_pkg vim
-    add_apt_pkg ssh
-    add_apt_pkg git
-    add_apt_pkg python3-colcon-common-extensions
-    add_apt_pkg ignition-fortress
-  fi
-
-  #################################################################
   ### WORKSPACE
 
-  if ! [ -d ~/${WSNAME}/src ];then
-    echo " --- Creating ~/${WSNAME} workspace ..."
-    mkdir -p ~/${WSNAME}/src
+  if ! [ -d ${WSPATH}/src ];then
+    echo " --- Creating ${WSPATH} workspace ..."
+    mkdir -p ${WSPATH}/src
   else
-    echo " --- Already found ~/$WSNAME workspace"
+    echo " --- Already found $WSPATH workspace"
   fi
 
   #################################################################
-  ###ADD ROS PACKAGES
-  
-  echo " --- Installing extra ros packages"
-  if [ $SUDOER == "true" ]; then
-    add_apt_rospkg rplidar-ros 
-    add_apt_rospkg rqt-tf-tree
-    add_apt_rospkg teleop-twist-keyboard
-    add_apt_rospkg turtlebot4-simulator 
-    add_apt_rospkg turtlebot4-desktop 
-    add_apt_rospkg turtlebot4-navigation 
-    add_apt_rospkg turtlebot4-node 
-    add_apt_rospkg turtlebot4-tutorials
-  fi
+  ### UPC_MRN PACKAGE
 
-  if ! [ -d ~/${WSNAME}/src/upc_mrn ]; then
+  if ! [ -d ${WSPATH}/src/upc_mrn ]; then
     echo " --- Downloading upc_mrn ROS package"
-    cd ~/${WSNAME}/src
+    cd ${WSPATH}/src
     git clone https://gitlab.com/joanvallve/upc_mrn.git
   else
     echo " --- Updating upc_mrn ROS package"
-    cd ~/${WSNAME}/src/upc_mrn
+    cd ${WSPATH}/src/upc_mrn
     git pull
   fi
   
   ######################################################
   ### BASHRC
-  echo " --- Updating file ~./bashrc"
+  echo " --- Updating file ${BASHFILE}"
 
   add_line_bashrc "source /opt/ros/${ROSVERSION}/setup.bash"
-  add_line_bashrc "source ~/${WSNAME}/install/local_setup.bash"
+  add_line_bashrc "source ${WSPATH}/install/local_setup.bash"
   add_line_bashrc "source /usr/share/colcon_cd/function/colcon_cd.sh"
   add_line_bashrc "export _colcon_cd_root=/opt/ros/${ROSVERSION}/"
   add_line_bashrc "source /usr/share/colcon_argcomplete/hook/colcon-argcomplete.bash"
   add_line_bashrc "export ROS_LOCALHOST_ONLY=1"
   add_line_bashrc "export ROS_DOMAIN_ID=0"
   
-  source ~/.bashrc
+  source ${BASHFILE}
 
   ######################################################
   ### COMPILE
   echo " --- Compiling ROS workspace"
-  cd ~/${WSNAME}
+  cd ${WSPATH}
   colcon build --symlink-install &>> ${REDIRECTION} || echo "###ERROR: workspace compilation"	
 
   cd $MYPWD
-  source ~/.bashrc
+  source ${BASHFILE}
   echo " --- Done!"
-}
-
-function add_apt_pkg #ARGS: pkg
-{
-  PKG=$1
-  echo " --- Installing apt package ${PKG}"
-  if [ $SUDO == "true" ]; then
-    sudo apt-get install -y ${PKG} &>> ${REDIRECTION} || echo "###ERROR Installing apt-get package ${PKG}, for more info check log file: $LOGDIR/$FILENAME.log"
-  else
-    apt-get install -y ${PKG} &>> ${REDIRECTION} || echo "###ERROR Installing apt-get package ${PKG}, for more info check log file: $LOGDIR/$FILENAME.log"
-  fi
-}
-
-function add_apt_rospkg #ARGS: pkg
-{
-  PKG=$1
-  add_apt_pkg ros-${ROSVERSION}-${PKG}
 }
 
 function add_line_bashrc #ARGS: line
 {
   LINE=$1
-  if ! grep -q "${LINE}" ~/.bashrc; then
-    echo " --- Adding line in .bashrc: ${LINE}"
-    echo ${LINE} >> ~/.bashrc
+  if ! grep -q "${LINE}" ${BASHFILE}; then
+    echo " --- Adding line in ${BASHFILE}: ${LINE}"
+    echo ${LINE} >> ${BASHFILE}
   fi
 }
 
