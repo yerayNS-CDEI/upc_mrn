@@ -6,8 +6,8 @@ main()
 
   # This script creates a ROS2 workspace with the package upc_mrn
   
-  WSPATH="~/data/ros2_ws"
-  BASHFILE="~/data/bashrc.d/mrn.sh"
+  WSPATH="${HOME}/data/ros2_ws"
+  BASHFILE="${HOME}/data/bashrc.d/mrn.sh"
   touch $BASHFILE
   
   #######################Logging#######################
