@@ -53,6 +53,10 @@ private:
     // RCLCPP_INFO(this->get_logger(), "I heard: '%s'", msg.data.c_str());
     received_joint_state_ = true;
 
+    // skip if no velocities
+    if (msg.velocity.size() != 2)
+      return;
+
     // skip if not initialized
     if (not odom_initialized_)
       return;
