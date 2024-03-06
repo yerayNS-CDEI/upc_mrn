@@ -7,6 +7,7 @@ Panels:
         - /Global Options1
         - /TF1/Frames1
         - /TF1/Tree1
+        - /LaserScan1
         - /ParticleCloud1/Topic1
       Splitter Ratio: 0.5833333134651184
     Tree Height: 835
@@ -345,7 +346,7 @@ Visualization Manager:
       Axis: Z
       Channel Name: intensity
       Class: rviz_default_plugins/LaserScan
-      Color: 16; 213; 0
+      Color: 246; 211; 45
       Color Transformer: FlatColor
       Decay Time: 0
       Enabled: true

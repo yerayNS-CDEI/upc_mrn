@@ -7,6 +7,7 @@ Panels:
         - /Global Options1
         - /TF1/Frames1
         - /TF1/Tree1
+        - /LaserScan1
         - /Map1/Topic1
         - /Map1/Update Topic1
         - /Global costmap1/Topic1
@@ -349,7 +350,7 @@ Visualization Manager:
       Axis: Z
       Channel Name: intensity
       Class: rviz_default_plugins/LaserScan
-      Color: 255; 255; 255
+      Color: 246; 211; 45
       Color Transformer: FlatColor
       Decay Time: 0
       Enabled: true
