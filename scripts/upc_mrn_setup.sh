@@ -64,6 +64,7 @@ main()
   add_line_bashrc "export _colcon_cd_root=/opt/ros/${ROSVERSION}/"
   add_line_bashrc "export IGN_IP=127.0.0.1"
   add_line_bashrc "export ROS_WS=${WSPATH}"
+  add_line_bashrc "export LIBGL_ALWAYS_SOFTWARE=true"
   
   # The following lines are already in ros.sh script
   #add_line_bashrc "source /opt/ros/${ROSVERSION}/setup.bash"
