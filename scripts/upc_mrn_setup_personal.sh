@@ -111,6 +111,7 @@ main()
   add_line_bashrc "export ROS_LOCALHOST_ONLY=1"
   add_line_bashrc "export ROS_DOMAIN_ID=0"
   add_line_bashrc "export ROS_WS=~/${WSNAME}"
+  add_line_bashrc "export IGN_IP=127.0.0.1"
   
   source ~/.bashrc
 

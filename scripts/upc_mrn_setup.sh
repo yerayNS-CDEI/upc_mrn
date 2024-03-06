@@ -59,12 +59,14 @@ main()
   ### BASHRC
   echo " --- Updating file ${BASHFILE}"
 
-  #add_line_bashrc "source /opt/ros/${ROSVERSION}/setup.bash"
   add_line_bashrc "source ${WSPATH}/install/local_setup.bash"
   add_line_bashrc "source /usr/share/colcon_cd/function/colcon_cd.sh"
   add_line_bashrc "export _colcon_cd_root=/opt/ros/${ROSVERSION}/"
   add_line_bashrc "export IGN_IP=127.0.0.1"
   add_line_bashrc "export ROS_WS=${WSPATH}"
+  
+  # The following lines are already in ros.sh script
+  #add_line_bashrc "source /opt/ros/${ROSVERSION}/setup.bash"
   #add_line_bashrc "source /usr/share/colcon_argcomplete/hook/colcon-argcomplete.bash"
   #add_line_bashrc "export ROS_LOCALHOST_ONLY=1"
   #add_line_bashrc "export ROS_DOMAIN_ID=0"
