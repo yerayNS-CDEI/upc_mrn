@@ -19,6 +19,7 @@ from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch.actions import IncludeLaunchDescription
+from launch.actions import SetEnvironmentVariable
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 import launch_ros.actions
@@ -50,6 +51,9 @@ def generate_launch_description():
     safety_param_set = launch_ros.actions.SetParameter(name='safety_override', value="full")
     reflexes_param_set = launch_ros.actions.SetParameter(name='reflexes_enabled', value=False)
 
+    # Software instead of GPU
+    set_opengl = SetEnvironmentVariable(name='LIBGL_ALWAYS_SOFTWARE', value=['True'])
+    
     # Directories
     pkg_upc_mrn = get_package_share_directory(
         'upc_mrn')
@@ -82,6 +86,7 @@ def generate_launch_description():
     ld = LaunchDescription(ARGUMENTS)
     ld.add_action(safety_param_set)
     ld.add_action(reflexes_param_set)
+    ld.add_action(set_opengl)
     ld.add_action(ignition)
     ld.add_action(robot_spawn)
     return ld

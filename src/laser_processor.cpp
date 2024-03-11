@@ -119,7 +119,7 @@ public:
         for (unsigned int i = 0; i < x.size(); i += n_print)
             RCLCPP_INFO(this->get_logger(), "for index=%d, x,y=%f,%f", i, x[i], y[i]);
 
-        publishMarker(x, y, n_viz, "base_scan", "cartesian", 1, 0.0, red, laser_msg.header.stamp);
+        publishMarker(x, y, n_viz, "rplidar_link", "cartesian", 1, 0.0, red, laser_msg.header.stamp);
 
         // ======== TRANSFORMATION 2 ========
         // scan points in base_link coordinates
@@ -151,21 +151,21 @@ public:
         for (unsigned int i = 0; i < x.size(); i += n_print)
             RCLCPP_INFO(this->get_logger(), "for index=%d, x,y=%f,%f", i, x[i], y[i]);
 
-        publishMarker(x, y, n_viz, "odom", "world", 2, sensor_z_, green, laser_msg.header.stamp);
+        publishMarker(x, y, n_viz, "odom", "global", 3, sensor_z_, green, laser_msg.header.stamp);
 
         RCLCPP_INFO(this->get_logger(), "---");
     }
 
     // Publisher of visualization markers for debugging purposes
     void publishMarker(const std::vector<double> &x,
-                        const std::vector<double> &y,
-                        const int &subsampling,
-                        const std::string &frame_id,
-                        const std::string &ns,
-                        const int &id,
-                        const double &z,
-                        const std_msgs::msg::ColorRGBA &color,
-                        const rclcpp::Time &t)
+                       const std::vector<double> &y,
+                       const int &subsampling,
+                       const std::string &frame_id,
+                       const std::string &ns,
+                       const int &id,
+                       const double &z,
+                       const std_msgs::msg::ColorRGBA &color,
+                       const rclcpp::Time &t)
     {
         visualization_msgs::msg::Marker marker;
         marker.header.frame_id = frame_id;
