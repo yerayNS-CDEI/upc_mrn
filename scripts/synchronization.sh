@@ -23,9 +23,11 @@ time_offset_s=$(bc <<< "scale=3; $time_offset / 1000")
 echo "time offset: ${time_offset_s} s"
 
 # adjust RPi time
-if [[ negative ]]; then
+if [[ "$negative" = true ]]; then
+  echo "correcting negative offset..."
   ssh ubuntu@$turtlebot_ip "echo turtlebot4 | sudo -S date -s '${time_offset_s} second' && exit"
 else
+  echo "correcting positive offset..."
   ssh ubuntu@$turtlebot_ip "echo turtlebot4 | sudo -S date -s '${time_offset_s} second ago' && exit"
 fi
 
