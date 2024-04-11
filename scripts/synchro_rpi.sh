@@ -12,10 +12,10 @@ echo "time offset: ${time_offset} ms"
 if [[ $time_offset -lt 0 ]]; then
   echo "negative offset"
   time_offset=${time_offset#-}
-  negative=TRUE
+  negative=true
 else
   echo "positive offset"
-  negative=FALSE
+  negative=false
 fi
 
 # convert to seconds
