@@ -9,6 +9,7 @@
 #include "nav_msgs/msg/occupancy_grid.hpp"
 #include "upc_mrn/msg/frontiers.hpp"
 #include "nav_msgs/msg/path.hpp"
+#include "geometry_msgs/msg/pose_stamped.hpp"
 
 #include "rclcpp_action/rclcpp_action.hpp"
 #include "nav2_msgs/action/navigate_to_pose.hpp"
@@ -36,6 +37,7 @@ protected:
     int robot_status_;                    // 0: moving, 1: goal reached, 2: failed to reach goal
     geometry_msgs::msg::Pose robot_pose_; // current robot pose
     geometry_msgs::msg::Pose goal_;       // last goal sent
+    rclcpp::Time goal_start_;             // used to compute goal_time
     double goal_time_;                    // seconds since last goal was sent
     double goal_distance_;                // remaining distance to reach the last goal
     rclcpp_action::GoalUUID goal_id_;     // last goal id
@@ -44,6 +46,7 @@ protected:
     rclcpp::CallbackGroup::SharedPtr callback_group_1_, callback_group_2_;
     rclcpp::Subscription<upc_mrn::msg::Frontiers>::SharedPtr frontiers_sub_;
     rclcpp::Subscription<nav_msgs::msg::OccupancyGrid>::SharedPtr map_sub_;
+    rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr goal_invalid_pub_, goal_pub_;
     nav_msgs::msg::OccupancyGrid map_;
     upc_mrn::msg::Frontiers frontiers_msg_;
     rclcpp_action::Client<NavToPose>::SharedPtr nav_to_pose_client_;
@@ -132,6 +135,10 @@ ExplorationBase::ExplorationBase(const std::string &_name)
         "/map", 1, std::bind(&ExplorationBase::mapCallback, this, std::placeholders::_1), options);
     frontiers_sub_ = this->create_subscription<upc_mrn::msg::Frontiers>(
         "/frontiers", 1, std::bind(&ExplorationBase::frontiersCallback, this, std::placeholders::_1), options);
+
+    // publishers
+    goal_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>("goal_sent", 1);
+    goal_invalid_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>("goal_invalid", 1);
 
     // Get parameters from ROS
     int node_period;
@@ -224,19 +231,31 @@ geometry_msgs::msg::Pose ExplorationBase::decideGoalBase()
     // Iteratively increase the radius until we obtain a valid goal
     double radius = 0.1;
     double path_length;
+    bool first_time = true;
     while (not isValidGoal(g, path_length))
     {
-        RCLCPP_WARN(this->get_logger(),
-                    "!!! Goal provided by decideGoal() is not valid [%f, %f, %f].\nGenerating random goal with radius %f...",
-                    g.position.x,
-                    g.position.y,
-                    tf2::getYaw(g.orientation),
-                    radius);
+        if (first_time)
+        {
+            RCLCPP_WARN(this->get_logger(),
+                        "!!! Goal provided by decideGoal() is not valid [%f, %f, %f].\nGenerating random goal in the surroundings...",
+                        g.position.x,
+                        g.position.y,
+                        tf2::getYaw(g.orientation));
+            geometry_msgs::msg::PoseStamped g_invalid;
+            g_invalid.header.frame_id = "map";
+            g_invalid.header.stamp = this->now();
+            g_invalid.pose = g;
+            goal_invalid_pub_->publish(g_invalid);
+        }
         g = generateRandomPose(radius, g);
 
         // Increase radius 5cm (limit the radius size to map size)
         if (radius < map_.info.height * map_.info.resolution or radius < map_.info.width * map_.info.resolution)
             radius += 0.05;
+
+        // exit if ctrl+c
+        if (not rclcpp::ok())
+            break;
     }
     return g;
 }
@@ -341,7 +360,7 @@ void ExplorationBase::finish()
 ///// AUXILIARY FUNCTIONS //////////////////////////////////////////////////////////////////////
 geometry_msgs::msg::Pose ExplorationBase::generateRandomPose(float radius, geometry_msgs::msg::Pose reference_pose)
 {
-    RCLCPP_INFO(this->get_logger(), "ExplorationBase::generateRandomPose");
+    RCLCPP_DEBUG(this->get_logger(), "ExplorationBase::generateRandomPose");
 
     if (radius <= 0)
     {
@@ -383,7 +402,7 @@ bool ExplorationBase::isValidGoal(const geometry_msgs::msg::Pose &goal, double &
     // not free (also returning false if out of map)
     if (not isFree(goal.position))
     {
-        RCLCPP_WARN(this->get_logger(), "ExplorationBase::isValidGoal(): Goal is not free or not inside the map");
+        RCLCPP_DEBUG(this->get_logger(), "ExplorationBase::isValidGoal(): Goal is not free or not inside the map");
         return false;
     }
     // return true if a path to that pose could be computed
@@ -391,7 +410,7 @@ bool ExplorationBase::isValidGoal(const geometry_msgs::msg::Pose &goal, double &
 
     if (path_length < 0)
     {
-        RCLCPP_WARN(this->get_logger(), "ExplorationBase::isValidGoal(): computePathLength() provided negative path lenght");
+        RCLCPP_DEBUG(this->get_logger(), "ExplorationBase::isValidGoal(): computePathLength() provided negative path lenght");
     }
     return path_length >= 0;
 }
@@ -471,8 +490,9 @@ bool ExplorationBase::sendGoal(const geometry_msgs::msg::Pose &goal_pose)
 
         // reset goal stats
         goal_ = goal_pose;
-        goal_distance_ = -1;
+        goal_distance_ = 1e9; // initialize far away
         goal_time_ = 0;
+        goal_start_ = this->now();
         num_goals_sent_++;
 
         // Send goal
@@ -484,6 +504,13 @@ bool ExplorationBase::sendGoal(const geometry_msgs::msg::Pose &goal_pose)
         send_goal_options.result_callback =
             std::bind(&ExplorationBase::goalResultCallback, this, _1);
         nav_to_pose_client_->async_send_goal(goal, send_goal_options);
+
+        // publish goal sent
+        geometry_msgs::msg::PoseStamped goal_ps;
+        goal_ps.header.frame_id = "map";
+        goal_ps.header.stamp = this->now();
+        goal_ps.pose = goal_pose;
+        goal_pub_->publish(goal_ps);
 
         // print
         RCLCPP_INFO(this->get_logger(), "ExplorationBase::sendGoal(): Sending Goal #%d: x=%4.2f, y=%4.2f, yaw=%4.2f",
@@ -497,7 +524,7 @@ bool ExplorationBase::sendGoal(const geometry_msgs::msg::Pose &goal_pose)
         int elapsed_time_seconds = int(t.seconds()) % 60;
 
         printf(
-            ">>> Exploration status:\n\tSent %d goals (aborted %d). Distance traveled %.2f m. Angle turned %.1f. "
+            ">>> Exploration status:\n\tSent %d goals (aborted %d). Distance traveled %.2f m. Angle turned %.1f rad. "
             "Duration: %2.2i:%2.2i min. Explored %.2f m^2 (%d cells)\n",
             num_goals_sent_,
             num_goals_ko_,
@@ -530,7 +557,7 @@ void ExplorationBase::goalResponseCallback(const GoalHandleNavToPose::SharedPtr 
         }
         else
         {
-            RCLCPP_INFO(this->get_logger(), "Goal accepted by nav_to_pose action server, robot is moving! %s", rclcpp_action::to_string(goal_handle->get_goal_id()).c_str());
+            RCLCPP_DEBUG(this->get_logger(), "Goal accepted by nav_to_pose action server, robot is moving! %s", rclcpp_action::to_string(goal_handle->get_goal_id()).c_str());
             goal_id_ = goal_handle->get_goal_id();
             robot_status_ = 0; // moving
         }
@@ -549,10 +576,14 @@ void ExplorationBase::goalFeedbackCallback(const GoalHandleNavToPose::SharedPtr 
         if (goal_handle->get_goal_id() != goal_id_)
             return;
 
-        RCLCPP_DEBUG(this->get_logger(), "Received feedback from nav_to_pose action");
+        // update goal_distance_ if proper number (first feedback messages contains wrong values)
+        double euclidean_distance = sqrt(pow(goal_.position.x - robot_pose_.position.x, 2) + pow(goal_.position.y - robot_pose_.position.y, 2));
+        if (feedback->distance_remaining >= euclidean_distance)
+            goal_distance_ = feedback->distance_remaining;
 
-        goal_distance_ = feedback->distance_remaining;
-        goal_time_ = rclcpp::Duration(feedback->navigation_time).seconds();
+        // navigation_time is also wrong in the first feedback messages, compute manually instead
+        //goal_time_ = rclcpp::Duration(feedback->navigation_time).seconds();
+        goal_time_ = (this->now() - goal_start_).seconds();
     }
     catch (const std::exception &e)
     {
@@ -567,12 +598,12 @@ void ExplorationBase::goalResultCallback(const GoalHandleNavToPose::WrappedResul
         if (result.goal_id != goal_id_)
             return;
 
-        RCLCPP_INFO(this->get_logger(), "Received result from nav_to_pose action");
+        RCLCPP_DEBUG(this->get_logger(), "Received result from nav_to_pose action");
 
         switch (result.code)
         {
         case rclcpp_action::ResultCode::SUCCEEDED:
-            RCLCPP_INFO(this->get_logger(), "Result from nav_to_pose: Goal was reached: %s", rclcpp_action::to_string(result.goal_id).c_str());
+            RCLCPP_DEBUG(this->get_logger(), "Result from nav_to_pose: Goal was reached: %s", rclcpp_action::to_string(result.goal_id).c_str());
             robot_status_ = 1; // reached
             return;
         case rclcpp_action::ResultCode::ABORTED:
@@ -611,7 +642,7 @@ double ExplorationBase::computePathLength(const geometry_msgs::msg::Pose &goal_p
         }
 
         // Populate a goal
-        RCLCPP_INFO(this->get_logger(), "compute_path_to_pose: x: %f, y: %f", goal_pose.position.x, goal_pose.position.y);
+        RCLCPP_DEBUG(this->get_logger(), "compute_path_to_pose: x: %f, y: %f", goal_pose.position.x, goal_pose.position.y);
         auto goal_msg = ComputePath::Goal();
         goal_msg.goal.header.frame_id = "map";
         goal_msg.goal.pose = goal_pose;
@@ -676,7 +707,7 @@ double ExplorationBase::computePathLength(const geometry_msgs::msg::Pose &goal_p
             }
         }
 
-        RCLCPP_INFO(this->get_logger(), "computed path length: %f", length);
+        RCLCPP_DEBUG(this->get_logger(), "computed path length: %f", length);
 
         return length;
     }

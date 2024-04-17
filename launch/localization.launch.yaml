@@ -13,5 +13,5 @@ launch:
       name: "map"
       value: "$(find-pkg-share upc_mrn)/maps/$(var map_name)"
     -
-      name: "params_file"
+      name: "params"
       value: "$(find-pkg-share upc_mrn)/config/localization.yaml"

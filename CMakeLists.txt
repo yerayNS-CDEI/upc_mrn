@@ -86,14 +86,14 @@ ament_target_dependencies(exploration_random
                           )
 target_link_libraries(exploration_random "${cpp_typesupport_target}")
 
-# ExplorationFirstFrontier
-add_executable(exploration_first_frontier src/exploration_first_frontier.cpp)
-ament_target_dependencies(exploration_first_frontier
+# ExplorationRandomFrontier
+add_executable(exploration_random_frontier src/exploration_random_frontier.cpp)
+ament_target_dependencies(exploration_random_frontier
                           rclcpp rclcpp_action
                           geometry_msgs nav2_msgs
                           tf2 tf2_ros tf2_geometry_msgs
                           )
-target_link_libraries(exploration_first_frontier "${cpp_typesupport_target}")
+target_link_libraries(exploration_random_frontier "${cpp_typesupport_target}")
 
 # ExplorationClosestFrontier
 add_executable(exploration_closest_frontier src/exploration_closest_frontier.cpp)
@@ -139,7 +139,7 @@ install(TARGETS
         safety_node
         find_frontiers
         exploration_random
-        exploration_first_frontier
+        exploration_random_frontier
         exploration_closest_frontier
         exploration_biggest_frontier
         exploration_project

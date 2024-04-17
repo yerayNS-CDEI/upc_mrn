@@ -26,12 +26,17 @@ bool ExplorationRandom::replan()
 {
   // Replan if the goal is closer than 'goal_dist_threshold_' m
   if (goal_distance_ < goal_dist_threshold_)
+  {
+    RCLCPP_INFO(this->get_logger(), "ExplorationRandom::replan(): Goal close enough REPLAN!");
     return true;
-
+  }
   // Replan ANYWAY if the robot (reached or) aborted the goal
   if (robot_status_ != 0)
+  {
+    RCLCPP_INFO_EXPRESSION(this->get_logger(), robot_status_ == 1, "ExplorationRandom::replan(): Robot status reached REPLAN!");
+    RCLCPP_WARN_EXPRESSION(this->get_logger(), robot_status_ == 2, "ExplorationRandom::replan(): Robot status aborted, REPLAN!");
     return true;
-
+  }
   return false;
 }
 
