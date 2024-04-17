@@ -16,7 +16,7 @@ protected:
 ExporationRandomFrontier::ExporationRandomFrontier() : ExplorationBase("exploration_random_frontier")
 {
     // Load parameters from ROS params
-    get_parameter_or("dt_replan", dt_replan_, 20.0);      // default 20s
+    get_parameter_or("dt_replan", dt_replan_, 200.0);      // default 200s
     get_parameter_or("dist_goal_th", dist_goal_th_, 0.5); // default 0.5m
 }
 

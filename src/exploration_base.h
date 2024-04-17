@@ -10,6 +10,7 @@
 #include "upc_mrn/msg/frontiers.hpp"
 #include "nav_msgs/msg/path.hpp"
 #include "geometry_msgs/msg/pose_stamped.hpp"
+#include "visualization_msgs/msg/marker.hpp"
 
 #include "rclcpp_action/rclcpp_action.hpp"
 #include "nav2_msgs/action/navigate_to_pose.hpp"
@@ -46,7 +47,9 @@ protected:
     rclcpp::CallbackGroup::SharedPtr callback_group_1_, callback_group_2_;
     rclcpp::Subscription<upc_mrn::msg::Frontiers>::SharedPtr frontiers_sub_;
     rclcpp::Subscription<nav_msgs::msg::OccupancyGrid>::SharedPtr map_sub_;
-    rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr goal_invalid_pub_, goal_pub_;
+    rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr goal_pub_;
+    rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr goal_invalid_pub_;
+    visualization_msgs::msg::Marker g_invalid_;
     nav_msgs::msg::OccupancyGrid map_;
     upc_mrn::msg::Frontiers frontiers_msg_;
     rclcpp_action::Client<NavToPose>::SharedPtr nav_to_pose_client_;
@@ -138,7 +141,20 @@ ExplorationBase::ExplorationBase(const std::string &_name)
 
     // publishers
     goal_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>("goal_sent", 1);
-    goal_invalid_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>("goal_invalid", 1);
+    goal_invalid_pub_ = this->create_publisher<visualization_msgs::msg::Marker>("goal_invalid", 1);
+    g_invalid_.header.frame_id = "map";
+    g_invalid_.header.stamp = this->now();
+    g_invalid_.type = visualization_msgs::msg::Marker::ARROW;
+    g_invalid_.action = visualization_msgs::msg::Marker::ADD;
+    g_invalid_.id = 1;
+    g_invalid_.scale.x = 1;
+    g_invalid_.scale.y = 0.05;
+    g_invalid_.scale.z = 0.05;
+    g_invalid_.color.a = 1.0;
+    g_invalid_.color.r = 1.0;
+    g_invalid_.color.g = 0.0;
+    g_invalid_.color.b = 0.0;
+    g_invalid_.lifetime = rclcpp::Duration(3, 0); // visualized for 3s
 
     // Get parameters from ROS
     int node_period;
@@ -225,7 +241,10 @@ geometry_msgs::msg::Pose ExplorationBase::decideGoalBase()
 {
     RCLCPP_DEBUG(this->get_logger(), "ExplorationBase::decideGoalBase");
 
-    geometry_msgs::msg::Pose g = decideGoal();
+    // secure call
+    geometry_msgs::msg::Pose g = robot_pose_;
+    if (not exploration_ended_)
+        g = decideGoal();
 
     // If the (for any reason) the decided goal is not a valid goal, generate a random goal in the surroundings
     // Iteratively increase the radius until we obtain a valid goal
@@ -241,20 +260,24 @@ geometry_msgs::msg::Pose ExplorationBase::decideGoalBase()
                         g.position.x,
                         g.position.y,
                         tf2::getYaw(g.orientation));
-            geometry_msgs::msg::PoseStamped g_invalid;
-            g_invalid.header.frame_id = "map";
-            g_invalid.header.stamp = this->now();
-            g_invalid.pose = g;
-            goal_invalid_pub_->publish(g_invalid);
+
+            // publish the invalid goal to visualize
+            g_invalid_.header.stamp = this->now();
+            g_invalid_.id++;
+            g_invalid_.pose = g;
+            goal_invalid_pub_->publish(g_invalid_);
+
+            first_time = false;
         }
+
+        // generate a new random pose
         g = generateRandomPose(radius, g);
 
         // Increase radius 5cm (limit the radius size to map size)
-        if (radius < map_.info.height * map_.info.resolution or radius < map_.info.width * map_.info.resolution)
-            radius += 0.05;
+        radius += 0.05;
 
-        // exit if ctrl+c
-        if (not rclcpp::ok())
+        // exit if ctrl+c or no more frontiers
+        if (not rclcpp::ok() or exploration_ended_)
             break;
     }
     return g;
@@ -372,14 +395,16 @@ geometry_msgs::msg::Pose ExplorationBase::generateRandomPose(float radius, geome
     if (not isInMap(reference_pose.position))
     {
         RCLCPP_WARN(this->get_logger(),
-                    "ExplorationBase::generateRandomPose(): reference position is not inside the map. Changed to map center");
+                    "ExplorationBase::generateRandomPose(): reference position is not inside the map. Changed to map center with big radius.");
         reference_pose.position = getMapCenter();
+        radius = sqrt(pow(map_.info.height * map_.info.resolution / 2, 2) + pow(map_.info.width * map_.info.resolution / 2, 2));
     }
 
     // If radius is higher than map size, reference is center of the map
-    if (radius >= map_.info.height * map_.info.resolution and radius >= map_.info.width * map_.info.resolution)
+    if (radius >= sqrt(pow(map_.info.height * map_.info.resolution / 2, 2) + pow(map_.info.width * map_.info.resolution / 2, 2)))
     {
         reference_pose.position = getMapCenter();
+        radius = sqrt(pow(map_.info.height * map_.info.resolution / 2, 2) + pow(map_.info.width * map_.info.resolution / 2, 2));
     }
 
     // Random radius and angle
@@ -513,7 +538,7 @@ bool ExplorationBase::sendGoal(const geometry_msgs::msg::Pose &goal_pose)
         goal_pub_->publish(goal_ps);
 
         // print
-        RCLCPP_INFO(this->get_logger(), "ExplorationBase::sendGoal(): Sending Goal #%d: x=%4.2f, y=%4.2f, yaw=%4.2f",
+        RCLCPP_INFO(this->get_logger(), "Sending Goal #%d: x=%4.2f, y=%4.2f, yaw=%4.2f",
                     num_goals_sent_,
                     goal.pose.pose.position.x,
                     goal.pose.pose.position.y,
@@ -524,7 +549,7 @@ bool ExplorationBase::sendGoal(const geometry_msgs::msg::Pose &goal_pose)
         int elapsed_time_seconds = int(t.seconds()) % 60;
 
         printf(
-            ">>> Exploration status:\n\tSent %d goals (aborted %d). Distance traveled %.2f m. Angle turned %.1f rad. "
+            ">>> Exploration status:\n      Sent %d goals (aborted %d). Distance traveled %.2f m. Angle turned %.1f rad. "
             "Duration: %2.2i:%2.2i min. Explored %.2f m^2 (%d cells)\n",
             num_goals_sent_,
             num_goals_ko_,
@@ -582,7 +607,7 @@ void ExplorationBase::goalFeedbackCallback(const GoalHandleNavToPose::SharedPtr 
             goal_distance_ = feedback->distance_remaining;
 
         // navigation_time is also wrong in the first feedback messages, compute manually instead
-        //goal_time_ = rclcpp::Duration(feedback->navigation_time).seconds();
+        // goal_time_ = rclcpp::Duration(feedback->navigation_time).seconds();
         goal_time_ = (this->now() - goal_start_).seconds();
     }
     catch (const std::exception &e)

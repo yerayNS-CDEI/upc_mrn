@@ -81,7 +81,7 @@ target_link_libraries(find_frontiers "${cpp_typesupport_target}")
 add_executable(exploration_random src/exploration_random.cpp)
 ament_target_dependencies(exploration_random
                           rclcpp rclcpp_action
-                          geometry_msgs nav2_msgs
+                          geometry_msgs nav2_msgs visualization_msgs
                           tf2 tf2_ros tf2_geometry_msgs
                           )
 target_link_libraries(exploration_random "${cpp_typesupport_target}")
@@ -90,7 +90,7 @@ target_link_libraries(exploration_random "${cpp_typesupport_target}")
 add_executable(exploration_random_frontier src/exploration_random_frontier.cpp)
 ament_target_dependencies(exploration_random_frontier
                           rclcpp rclcpp_action
-                          geometry_msgs nav2_msgs
+                          geometry_msgs nav2_msgs visualization_msgs
                           tf2 tf2_ros tf2_geometry_msgs
                           )
 target_link_libraries(exploration_random_frontier "${cpp_typesupport_target}")
@@ -99,7 +99,7 @@ target_link_libraries(exploration_random_frontier "${cpp_typesupport_target}")
 add_executable(exploration_closest_frontier src/exploration_closest_frontier.cpp)
 ament_target_dependencies(exploration_closest_frontier
                           rclcpp rclcpp_action
-                          geometry_msgs nav2_msgs
+                          geometry_msgs nav2_msgs visualization_msgs
                           tf2 tf2_ros tf2_geometry_msgs
                           )
 target_link_libraries(exploration_closest_frontier "${cpp_typesupport_target}")
@@ -108,7 +108,7 @@ target_link_libraries(exploration_closest_frontier "${cpp_typesupport_target}")
 add_executable(exploration_biggest_frontier src/exploration_biggest_frontier.cpp)
 ament_target_dependencies(exploration_biggest_frontier
                           rclcpp rclcpp_action
-                          geometry_msgs nav2_msgs
+                          geometry_msgs nav2_msgs visualization_msgs
                           tf2 tf2_ros tf2_geometry_msgs
                           )
 target_link_libraries(exploration_biggest_frontier "${cpp_typesupport_target}")
@@ -117,7 +117,7 @@ target_link_libraries(exploration_biggest_frontier "${cpp_typesupport_target}")
 add_executable(exploration_project src/exploration_project.cpp)
 ament_target_dependencies(exploration_project
                           rclcpp rclcpp_action
-                          geometry_msgs nav2_msgs
+                          geometry_msgs nav2_msgs visualization_msgs
                           tf2 tf2_ros tf2_geometry_msgs
                           )
 target_link_libraries(exploration_project "${cpp_typesupport_target}")
@@ -126,7 +126,7 @@ target_link_libraries(exploration_project "${cpp_typesupport_target}")
 # add_executable(exploration_project2 src/exploration_project2.cpp)
 # ament_target_dependencies(exploration_project2
 #                           rclcpp rclcpp_action
-#                           geometry_msgs nav2_msgs
+#                           geometry_msgs nav2_msgs visualization_msgs
 #                           tf2 tf2_ros tf2_geometry_msgs
 #                           )
 # target_link_libraries(exploration_project2 "${cpp_typesupport_target}")

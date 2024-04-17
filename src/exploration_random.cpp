@@ -42,15 +42,13 @@ bool ExplorationRandom::replan()
 
 geometry_msgs::msg::Pose ExplorationRandom::decideGoal()
 {
-  // generate a random pose in a circle centered at current position and radius bigger than the map size
-  double radius = std::max(2 * map_.info.height * map_.info.resolution, 2 * map_.info.width * map_.info.resolution);
-
-  geometry_msgs::msg::Pose g = generateRandomPose(radius, robot_pose_);
-
-  // generate again until we get a valid goal
-  double path_length;
-  while (not isValidGoal(g, path_length))
-    g = generateRandomPose(radius, robot_pose_);
+  // generate a random pose whitin the map (eventually will be invalid)
+  geometry_msgs::msg::Pose g;
+  g.position.x = map_.info.origin.position.x + map_.info.width * map_.info.resolution * (rand() % 100) / 100.0;
+  g.position.y = map_.info.origin.position.y + map_.info.height * map_.info.resolution * (rand() % 100) / 100.0;
+  tf2::Quaternion q;
+  q.setRPY(0, 0, 2 * M_PI * (rand() % 100) / 100.0);
+  g.orientation = tf2::toMsg(q);
 
   return g;
 }
