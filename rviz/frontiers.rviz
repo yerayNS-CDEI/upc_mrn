@@ -9,6 +9,7 @@ Panels:
         - /TF1/Tree1
         - /Map1/Topic1
         - /Map1/Update Topic1
+        - /Frontiers1/Namespaces1
         - /Global costmap1/Topic1
         - /Local costmap1/Topic1
         - /Local plan candidates1/Topic1
@@ -465,7 +466,7 @@ Visualization Manager:
       Enabled: true
       Name: Goal invalid
       Namespaces:
-        {}
+        "": true
       Topic:
         Depth: 5
         Durability Policy: Volatile
@@ -522,10 +523,10 @@ Visualization Manager:
       Name: Current View
       Near Clip Distance: 0.009999999776482582
       Scale: 68.66041564941406
-      Target Frame: base_link
+      Target Frame: map
       Value: TopDownOrtho (rviz_default_plugins)
-      X: 0.597141683101654
-      Y: 1.3399279117584229
+      X: -0.8195466995239258
+      Y: -0.3078101575374603
     Saved: ~
 Window Geometry:
   Displays:
