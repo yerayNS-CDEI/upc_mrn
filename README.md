@@ -58,7 +58,7 @@ And then, launch the simulation (gazebo ignition) of the Turtlebot4 lite (rgbd c
 ros2 launch upc_mrn sim.launch.py world:=rooms gui:=false
 ```
 
-### 2.2.1. `sim.launch.py` arguments
+**`sim.launch.py` arguments:**
 
 - `gui`: Whether launch the gazebo GUI or not. (default: `true`)
 - `world`: which world to load. Available: `empty`, `rooms`, `simple`, `large`, `small`. (default: `empty`)
@@ -67,20 +67,29 @@ ros2 launch upc_mrn sim.launch.py world:=rooms gui:=false
 
 ## 2.3. SLAM_toolbox
 
-In another terminal, launch the SLAM method (slam_toolbox):
+In this example we will run the `slam_toolbox` to create a map of the environment.
+In another terminal, run the launch:
 
 ```bash
 ros2 launch upc_mrn slam.launch.yaml
 ```
 
-The visualization (RVIZ2) in a third terminal
+Then, the visualization (RVIZ2) in a third terminal:
 
 ```bash
 rviz2 -d ~/ros2_ws/src/upc_mrn/rviz/slam.rviz
 ```
 
-And finally, you can move the robot with `teleop_twist_keyboard` in a fourth terminal:
+And finally, to move the robot, run the `teleop_twist_keyboard` node in a fourth terminal:
 
 ```bash
 ros2 run teleop_twist_keyboard teleop_twist_keyboard
+```
+
+## 2.4 Navigation
+
+Instead of the teleoperation, we can launch the navigation (nav2) with a launch also provided:
+
+```bash
+ros2 launch upc_mrn nav.launch.yaml
 ```
