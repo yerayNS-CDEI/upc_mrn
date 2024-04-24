@@ -2,7 +2,7 @@ This is a ros2 package for the practices of the subject Mobile Robotics and Navi
 
 These practices are performed on Turtlebot4 lite platforms simulated and real.
 
-# Dependencies
+# 1. Dependencies
 
 For these practices you will need a PC with Ubuntu 22.04 and ros humble installed (ros-humble-desktop-full recommended).
 
@@ -20,20 +20,19 @@ Apart from ROS humble, the following dependencies are required for the practices
 - ros-humble-turtlebot4-node 
 - ros-humble-turtlebot4-tutorials
 
-## Setup script
+## 1.1 Setup script
 
 For the students convenience, we provide an script to install the dependencies, configure a ros workspace (~/ros2_ws) and clone this package, in your personal laptop (Ubuntu 22.04 and ros humble required).
 This script needs to be executed once. 
 
-1. Download the script:
+First, download the script:
 
 ```bash
 wget --no-check-certificate -O mrn_setup.sh http://bit.ly/upc_mrn_laptop
 ```
 
 Terminal output should say it downloaded the file successfully, otherwise, try again. 
-
-2. Then, execute the script (your password will be required):
+Then, execute the script (your password will be required):
 
 ```bash
 source mrn_setup.sh
@@ -41,9 +40,9 @@ source mrn_setup.sh
 
 Check that no errors occurred and then you can remove the script and the logs that were generated (rm mrn_setup.sh log_mrn_setup.log).
 
-# Example
+# 2. Example
 
-## Compile `upc_mrn`
+## 2.1 Compile `upc_mrn`
 
 To check that everything is working you need first to compile the upc_mrn package:
 
@@ -51,7 +50,7 @@ To check that everything is working you need first to compile the upc_mrn packag
 cd ~/ros2_ws && colcon build --symlink-install --packages-up-to upc_mrn
 ```
 
-## Simulation of turtlebot4 lite
+## 2.2 Simulation of turtlebot4 lite
 
 And then, launch the simulation (gazebo ignition) of the Turtlebot4 lite (rgbd camera is not simulated for efficiency) in a room-like environment:
 
@@ -59,7 +58,7 @@ And then, launch the simulation (gazebo ignition) of the Turtlebot4 lite (rgbd c
 ros2 launch upc_mrn sim.launch.py world:=rooms gui:=false
 ```
 
-## SLAM_toolbox
+## 2.3 SLAM_toolbox
 
 In another terminal, launch the SLAM method (slam_toolbox):
 
