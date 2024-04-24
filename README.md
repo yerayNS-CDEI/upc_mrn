@@ -58,6 +58,13 @@ And then, launch the simulation (gazebo ignition) of the Turtlebot4 lite (rgbd c
 ros2 launch upc_mrn sim.launch.py world:=rooms gui:=false
 ```
 
+### 2.2.1. `sim.launch.py` arguments
+
+- `gui`: Whether launch the gazebo GUI or not. (default: `true`)
+- `world`: which world to load. Available: `empty`, `rooms`, `simple`, `large`, `small`. (default: `empty`)
+- `x`, `y`, `yaw`: initial pose of the robot. (default: origin)
+- `oak`: Whether a robot with the plugin of the OAK rbd camera or a robot without it. (default: `false`)
+
 ## 2.3. SLAM_toolbox
 
 In another terminal, launch the SLAM method (slam_toolbox):
