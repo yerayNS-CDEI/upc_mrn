@@ -1,2 +1,3 @@
 scripts/log_upc_mrn_setup.log
 .vscode/*
+launch/__pycache__/*
