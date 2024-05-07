@@ -19,7 +19,7 @@ else
 fi
 
 # convert to seconds
-time_offset_s=$(bc <<< "scale=3; $time_offset / 1000")
+time_offset_s=0$(bc <<< "scale=3; $time_offset / 1000")
 echo "time offset: ${time_offset_s} s"
 
 # adjust RPi time
