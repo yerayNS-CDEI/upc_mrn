@@ -30,7 +30,7 @@ public:
 
 private:
     void mapCallback(const nav_msgs::msg::OccupancyGrid &msg);
-    std::vector<int> twoPassLabeling(const nav_msgs::msg::OccupancyGrid &map_frontiers, std::map<int, int> &labels_sizes) const;
+    std::vector<int> twoPassLabeling(const nav_msgs::msg::OccupancyGrid &map_frontiers, std::map<int, int> &labels_sizes, bool diagonal) const;
     bool isFrontier(const int &cell, const nav_msgs::msg::OccupancyGrid &map) const;
     void publishMarkers(const upc_mrn::msg::Frontiers &frontiers_msg);
 
@@ -93,7 +93,7 @@ void FindFrontiers::mapCallback(const nav_msgs::msg::OccupancyGrid &msg)
     }
     // Label free (connected cells)
     std::map<int, int> labels_free_sizes;
-    std::vector<int> labels_free = twoPassLabeling(map_free, labels_free_sizes);
+    std::vector<int> labels_free = twoPassLabeling(map_free, labels_free_sizes, false);
     // Classify as unknown all free groups except for the biggest one
     int remaining_label = std::max_element(labels_free_sizes.begin(),
                                            labels_free_sizes.end(),
@@ -130,7 +130,7 @@ void FindFrontiers::mapCallback(const nav_msgs::msg::OccupancyGrid &msg)
 
     // Label frontiers (connected cells)
     std::map<int, int> labels_sizes;
-    std::vector<int> labels = twoPassLabeling(map_frontiers, labels_sizes);
+    std::vector<int> labels = twoPassLabeling(map_frontiers, labels_sizes, true);
 
     // Create and fill frontiers message
     std::vector<int> frontiers_labels;
@@ -231,7 +231,7 @@ bool FindFrontiers::isFrontier(const int &cell, const nav_msgs::msg::OccupancyGr
 }
 
 // Two pass labeling to label frontiers [http://en.wikipedia.org/wiki/Connected-component_labeling]
-std::vector<int> FindFrontiers::twoPassLabeling(const nav_msgs::msg::OccupancyGrid &map_labelr, std::map<int, int> &labels_sizes) const
+std::vector<int> FindFrontiers::twoPassLabeling(const nav_msgs::msg::OccupancyGrid &map_labelr, std::map<int, int> &labels_sizes, bool diagonal) const
 {
     labels_sizes.clear();
     std::vector<int> labels(map_labelr.data.size());
@@ -249,12 +249,12 @@ std::vector<int> FindFrontiers::twoPassLabeling(const nav_msgs::msg::OccupancyGr
         if (map_labelr.data[i] != 0)
         {
             neigh_labels.clear();
-            // Find 8-connectivity neighbours already labeled
-            if (upleftCell(i, map_labelr) != -1 && labels[upleftCell(i, map_labelr)] != 0)
+            // Find )8 or 4) connectivity neighbours already labeled
+            if (diagonal && upleftCell(i, map_labelr) != -1 && labels[upleftCell(i, map_labelr)] != 0)
                 neigh_labels.push_back(labels[upleftCell(i, map_labelr)]);
             if (upCell(i, map_labelr) != -1 && labels[upCell(i, map_labelr)] != 0)
                 neigh_labels.push_back(labels[upCell(i, map_labelr)]);
-            if (uprightCell(i, map_labelr) != -1 && labels[uprightCell(i, map_labelr)] != 0)
+            if (diagonal && uprightCell(i, map_labelr) != -1 && labels[uprightCell(i, map_labelr)] != 0)
                 neigh_labels.push_back(labels[uprightCell(i, map_labelr)]);
             if (leftCell(i, map_labelr) != -1 && labels[leftCell(i, map_labelr)] != 0)
                 neigh_labels.push_back(labels[leftCell(i, map_labelr)]);
@@ -304,7 +304,7 @@ void FindFrontiers::publishMarkers(const upc_mrn::msg::Frontiers &frontiers_msg)
     for (unsigned int i = 0; i < frontiers_msg.frontiers.size(); i++)
     {
         std_msgs::msg::ColorRGBA c;
-        double x = (double) i / (double) frontiers_msg.frontiers.size();
+        double x = (double)i / (double)frontiers_msg.frontiers.size();
         c.a = 1.0;
         c.r = x < 0.33 ? 1 - 0.33 * x : (x < 0.66 ? 0 : 3 * (x - 0.66));
         c.g = x < 0.33 ? 3 * x : (x < 0.66 ? 1 - 0.33 * (x - 0.33) : 0);
