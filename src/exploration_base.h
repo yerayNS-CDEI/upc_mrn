@@ -115,7 +115,9 @@ protected:
 };
 
 ExplorationBase::ExplorationBase(const std::string &_name)
-    : Node(_name),
+    : Node(_name, rclcpp::NodeOptions()
+                      .allow_undeclared_parameters(true)
+                      .automatically_declare_parameters_from_overrides(true)),
       robot_status_(1),
       cells_explored_(0),
       num_goals_sent_(0),
