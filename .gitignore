@@ -1,3 +1,5 @@
 scripts/log_upc_mrn_setup.log
 .vscode/*
 launch/__pycache__/*
+build_debug
+build_release
