@@ -48,7 +48,7 @@ main()
   if ! [ -d ${WSPATH}/src/upc_mrn ]; then
     echo " --- Downloading upc_mrn ROS package"
     cd ${WSPATH}/src
-    git clone https://gitlab.com/asantamarianavarro/code/teaching/mrn-mobile-robotics-and-navigation/upc-mrn.git
+    git clone https://gitlab.com/asantamarianavarro/code/teaching_public/upc-mrn.git
   else
     echo " --- Updating upc_mrn ROS package"
     cd ${WSPATH}/src/upc_mrn
