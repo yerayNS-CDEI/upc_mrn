@@ -26,7 +26,7 @@ public:
     v_max_ = 1e9;
 
     // Declare parameters with default values
-    declare_parameter("t_safe", 5.0);       // default 5s
+    declare_parameter("t_safe", 1.0);       // default 1s
     declare_parameter("robot_radius", 0.2); // default 20cm
 
     // load parameters
