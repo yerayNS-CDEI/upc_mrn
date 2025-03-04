@@ -131,7 +131,7 @@ public:
         // TODO 2b END
 
         // OUTPUT2
-        RCLCPP_INFO(this->get_logger(), "World frame:");
+        RCLCPP_INFO(this->get_logger(), "base_link frame:");
         for (unsigned int i = 0; i < x.size(); i += n_print)
             RCLCPP_INFO(this->get_logger(), "for index=%d, x,y=%f,%f", i, x[i], y[i]);
 
@@ -147,7 +147,7 @@ public:
         // TODO 3 END
 
         // OUTPUT2
-        RCLCPP_INFO(this->get_logger(), "World frame:");
+        RCLCPP_INFO(this->get_logger(), "odom frame:");
         for (unsigned int i = 0; i < x.size(); i += n_print)
             RCLCPP_INFO(this->get_logger(), "for index=%d, x,y=%f,%f", i, x[i], y[i]);
 
