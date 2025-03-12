@@ -65,7 +65,11 @@ ament_target_dependencies(laser_processor
 add_executable(safety_node src/safety_node.cpp)
 ament_target_dependencies(safety_node
                           rclcpp
+                          tf2
+                          tf2_geometry_msgs
                           geometry_msgs
+                          nav_msgs
+                          visualization_msgs
                           sensor_msgs)
 
 # FindFrontiers
