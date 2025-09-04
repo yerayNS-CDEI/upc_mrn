@@ -160,6 +160,12 @@ void SafetyNode::laserCallback(const sensor_msgs::msg::LaserScan &laser_msg)
   //         and store it in scan_x_ and scan_y_ variables
   // =================
 
+  for(unsigned int i=0; i<size; i++)
+  {
+    float angle = angle_min + i*angle_inc;
+    scan_x_[i] = laser_msg.ranges[i] * cos(angle);
+    scan_y_[i] = laser_msg.ranges[i] * sin(angle);
+  }   
 
   // =================
   // END TODO 1
@@ -170,6 +176,14 @@ void SafetyNode::laserCallback(const sensor_msgs::msg::LaserScan &laser_msg)
   //         The pose of the laser frame in the robot base is already defined by the variables
   //         sensor_x_, sensor_y_, sensor_z_ and sensor_yaw_
   // =================
+
+  for(unsigned int i=0; i<size; i++)
+  {
+    double x_i = scan_x_[i];
+    double y_i = scan_y_[i];
+    scan_x_[i] = x_i*cos(sensor_yaw_) - y_i*sin(sensor_yaw_) + sensor_x_;
+    scan_y_[i] = x_i*sin(sensor_yaw_) + y_i*cos(sensor_yaw_) + sensor_y_;
+  }
 
   // =================
   // END TODO 2

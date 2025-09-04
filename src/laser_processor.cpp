@@ -145,13 +145,18 @@ public:
         //                 0.000  0.000  1.000  0.139
         //                 0.000  0.000  0.000  1.000
         //                 ];
+        // rot_matrix_Z = [  cos(th) -sin(th) 0.000 sensor_x
+        //                   sin(th)  cos(th) 0.000 sensor_y
+        //                    0.000    0.000  1.000 sensor_z
+        //                    0.000    0.000  0.000  1.000
+        //                 ];
         
         for(unsigned int i=0; i<size; i++)
         {
           double x_i = x[i];
           double y_i = y[i];
-          x[i] = -y_i+sensor_x_;
-          y[i] = x_i+sensor_x_;
+          x[i] = x_i*cos(sensor_yaw_) - y_i*sin(sensor_yaw_) + sensor_x_;
+          y[i] = x_i*sin(sensor_yaw_) + y_i*cos(sensor_yaw_) + sensor_y_;
         }
 
         // TODO 2b END
