@@ -160,7 +160,10 @@ void SafetyNode::laserCallback(const sensor_msgs::msg::LaserScan &laser_msg)
   //         and store it in scan_x_ and scan_y_ variables
   // =================
 
-  for(unsigned int i=0; i<size; i++)
+  float angle_min = laser_msg.angle_min;
+  float angle_inc = laser_msg.angle_increment;
+  
+  for(int i=0; i<size; i++)
   {
     float angle = angle_min + i*angle_inc;
     scan_x_[i] = laser_msg.ranges[i] * cos(angle);
@@ -177,7 +180,7 @@ void SafetyNode::laserCallback(const sensor_msgs::msg::LaserScan &laser_msg)
   //         sensor_x_, sensor_y_, sensor_z_ and sensor_yaw_
   // =================
 
-  for(unsigned int i=0; i<size; i++)
+  for(int i=0; i<size; i++)
   {
     double x_i = scan_x_[i];
     double y_i = scan_y_[i];
@@ -235,6 +238,34 @@ void SafetyNode::cmdvelCallback(const geometry_msgs::msg::Twist &msg)
 
 
     // =================
+    
+    double linear_vel_teleop_ = cmdvel_safe_msg_.linear.x;
+    double angular_vel_teleop_ = cmdvel_safe_msg_.angular.z;
+    double pth = 0.0;
+    std::vector<double> pred_pose_x_vect(num_states, 0.0);  // Path vector of the robot w.r.t. base_link
+    std::vector<double> pred_pose_y_vect(num_states, 0.0);
+
+    for (int i = 1; i < num_states; i += 1){
+      float vx = linear_vel_teleop_;
+      float w = angular_vel_teleop_;
+      
+      pth += w * dt / 2;
+      px += vx * dt * cos(pth);
+      py += vx * dt * sin(pth);
+      pth += w * dt / 2;
+
+      // pred_pose_x_vect[i] = px;
+      // pred_pose_y_vect[i] = py;
+
+      for (unsigned int j = 0; j < scan_x.size(); j += 1) {
+        obst_dist = std::sqrt(std::pow((scan_x[j]-px),2)+std::pow((scan_y[j]-py),2));
+        if (robot_radius_ > obst_dist) {
+          collision = true;
+          collision_idx = j;
+        }
+      }
+    }
+
     // END TODO 3
 
     // Visualization
