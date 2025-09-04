@@ -73,11 +73,19 @@ private:
     double w = 0.0;
 
     //////// TODO //////
-    // v_front =
-    // w =
-    // x_ =
-    // y_ =
-    // th_ =
+    // v_front = 0.5*(left_angular_vel+right_angular_vel)*radius_;
+    // w = (-left_angular_vel+right_angular_vel)*(radius_/wheel_distance_);
+    // th_ = th_ + (w*dt)/2;
+    // x_ = x_ + v_front*dt * cos(th_);
+    // y_ = y_ + v_front*dt * sin(th_);
+    // th_ = th_ + (w*dt)/2;
+    v_front  = (radius_ * (right_angular_vel + left_angular_vel)/2);
+    w = (radius_ * (right_angular_vel - left_angular_vel)/wheel_distance_);
+    th_ = th_ + ((w * dt)/2);
+    x_  = x_ + cos(th_) * v_front * dt;
+    y_  = y_ + sin(th_) * v_front * dt;
+    th_ = th_ + ((w * dt)/2);
+    // RCLCPP_INFO(this->get_logger(), "Computed x: %f (m)\t y: %f (m)\t th: %f (rad)", x_, y_, th_);
     //////// TODO //////
 
     // Fill odometry msg
