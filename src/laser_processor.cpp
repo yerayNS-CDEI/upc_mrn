@@ -54,17 +54,17 @@ public:
 
         // transform from platform to sensor
         // TODO 2a START
-        // sensor_x_   =
-        // sensor_y_   =
-        // sensor_z_   =
-        // sensor_yaw_ =
+        sensor_x_   = 0.004
+        sensor_y_   = 0.0
+        sensor_z_   = 0.139
+        sensor_yaw_ = 1.571
         // TODO 2a END
     }
 
     // Callback of laser scan
     void laserCallback(const sensor_msgs::msg::LaserScan &laser_msg)
     {
-        int size = laser_msg.ranges.size();
+        unsigned int size = laser_msg.ranges.size();
         RCLCPP_INFO(this->get_logger(), "Received scan ranges size=%d", size);
         std::vector<double> x(size, 0.0);
         std::vector<double> y(size, 0.0);
@@ -98,6 +98,7 @@ public:
         // int other_size=3;
         // double value=7.89;
         // std::vector<double> vvv(other_size,value);
+
         // //Loop through a vector
         // for(unsigned int i=0; i<vvv.size(); i++)
         // {
@@ -109,9 +110,22 @@ public:
         // scan from polar to cartesian (sensor coordinates)
 
         // TODO 1 START
-        //
-        //
-        //
+        float angle_min = laser_msg.angle_min;
+        float angle_max = laser_msg.angle_max;
+        float angle_inc = laser_msg.angle_increment;
+
+        RCLCPP_INFO(this->get_logger(), "Received scan ranges min=%f", angle_min);
+        RCLCPP_INFO(this->get_logger(), "Received scan ranges max=%f", angle_max);
+        RCLCPP_INFO(this->get_logger(), "Received scan ranges inc=%f", angle_inc);
+
+        for(unsigned int i=0; i<size; i++)
+        {
+          float angle = angle_min + i*angle_inc;
+          x[i] = laser_msg.ranges[i] * cos(angle);
+          y[i] = laser_msg.ranges[i] * sin(angle);
+        // x = r * cos(th)
+        // y = r * sin(th)
+        }        
         // TODO 1 END
 
         // OUTPUT1
@@ -125,7 +139,32 @@ public:
         // scan points in base_link coordinates
 
         // TODO 2b START
-        //
+        std::vector<std::vector<int> > rot_matrix(4);
+        for (int i = 0; i < 4; i++) {
+            mat[i].resize(4); // this will allow you to now just use [][] to access stuff
+        }
+        rot_matrix[0][0] = 0.0
+        rot_matrix[0][1] = 0.0
+        rot_matrix[0][2] = 0.0
+        rot_matrix[0][3] = 0.0
+        rot_matrix[1][0] = 0.0
+        rot_matrix[1][1] = 0.0
+        rot_matrix[1][2] = 0.0
+        rot_matrix[1][3] = 0.0
+        rot_matrix[2][0] = 0.0
+        rot_matrix[2][1] = 0.0
+        rot_matrix[2][2] = 0.0
+        rot_matrix[2][3] = 0.0
+        rot_matrix[3][0] = 0.0
+        rot_matrix[3][1] = 0.0
+        rot_matrix[3][2] = 0.0
+        rot_matrix[3][3] = 0.0
+
+        rot_matrix = [  0.000 -1.000  0.000  0.004
+                        1.000  0.000  0.000  0.000
+                        0.000  0.000  1.000  0.139
+                        0.000  0.000  0.000  1.000
+                        ];
         //
         //
         // TODO 2b END
@@ -181,9 +220,9 @@ public:
         marker.pose.orientation.y = 0.0;
         marker.pose.orientation.z = 0.0;
         marker.pose.orientation.w = 1.0;
-        marker.scale.x = 0.01;
-        marker.scale.y = 0.01;
-        marker.scale.z = 0.01;
+        marker.scale.x = 0.1;
+        marker.scale.y = 0.1;
+        marker.scale.z = 0.1;
         marker.color = color;
         marker.lifetime = rclcpp::Duration(0, 0);
 
