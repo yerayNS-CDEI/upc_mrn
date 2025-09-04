@@ -54,10 +54,10 @@ public:
 
         // transform from platform to sensor
         // TODO 2a START
-        sensor_x_   = 0.004
-        sensor_y_   = 0.0
-        sensor_z_   = 0.139
-        sensor_yaw_ = 1.571
+        sensor_x_   = 0.004;
+        sensor_y_   = 0.0;
+        sensor_z_   = 0.139;
+        sensor_yaw_ = 1.571;
         // TODO 2a END
     }
 
@@ -139,34 +139,21 @@ public:
         // scan points in base_link coordinates
 
         // TODO 2b START
-        std::vector<std::vector<int> > rot_matrix(4);
-        for (int i = 0; i < 4; i++) {
-            mat[i].resize(4); // this will allow you to now just use [][] to access stuff
+        
+        // rot_matrix = [  0.000 -1.000  0.000  0.004
+        //                 1.000  0.000  0.000  0.000
+        //                 0.000  0.000  1.000  0.139
+        //                 0.000  0.000  0.000  1.000
+        //                 ];
+        
+        for(unsigned int i=0; i<size; i++)
+        {
+          double x_i = x[i];
+          double y_i = y[i];
+          x[i] = -y_i+sensor_x_;
+          y[i] = x_i+sensor_x_;
         }
-        rot_matrix[0][0] = 0.0
-        rot_matrix[0][1] = 0.0
-        rot_matrix[0][2] = 0.0
-        rot_matrix[0][3] = 0.0
-        rot_matrix[1][0] = 0.0
-        rot_matrix[1][1] = 0.0
-        rot_matrix[1][2] = 0.0
-        rot_matrix[1][3] = 0.0
-        rot_matrix[2][0] = 0.0
-        rot_matrix[2][1] = 0.0
-        rot_matrix[2][2] = 0.0
-        rot_matrix[2][3] = 0.0
-        rot_matrix[3][0] = 0.0
-        rot_matrix[3][1] = 0.0
-        rot_matrix[3][2] = 0.0
-        rot_matrix[3][3] = 0.0
 
-        rot_matrix = [  0.000 -1.000  0.000  0.004
-                        1.000  0.000  0.000  0.000
-                        0.000  0.000  1.000  0.139
-                        0.000  0.000  0.000  1.000
-                        ];
-        //
-        //
         // TODO 2b END
 
         // OUTPUT2
@@ -180,9 +167,15 @@ public:
         // scan points in odom coordinates
 
         // TODO 3 START
-        //
-        //
-        //
+        
+        for(unsigned int i=0; i<size; i++)
+        {
+          double x_i = x[i];
+          double y_i = y[i];
+          x[i] = x_i*cos(pose_yaw_) - y_i*sin(pose_yaw_) + pose_x_;
+          y[i] = x_i*sin(pose_yaw_) + y_i*cos(pose_yaw_) + pose_y_;
+        }
+        
         // TODO 3 END
 
         // OUTPUT2
