@@ -42,10 +42,10 @@ ExplorationBiggestFrontier::ExplorationBiggestFrontier() : ExplorationBase("expl
     // get_parameter_or("time_max_goal", time_max_goal_, 20);
 
     // Get the maximum distance to the goal in which the robot recomputes a new goal
-    get_parameter_or("dist_goal_replan", dist_goal_replan_, 1);
+    get_parameter_or("dist_goal_replan", dist_goal_replan_, 1.0);
 
     // Get the maximum amount of time elapsed between goals computation
-    get_parameter_or("dt_last_goal_replan", dt_last_goal_replan_, 4);
+    get_parameter_or("dt_last_goal_replan", dt_last_goal_replan_, 4.0);
 
     //////////////////////////////////////////////////////////////////////
     // TODO 1b END

@@ -78,7 +78,11 @@ ament_target_dependencies(find_frontiers
                           rclcpp
                           geometry_msgs
                           nav_msgs
-                          visualization_msgs)
+                          visualization_msgs
+                          std_msgs
+                          tf2
+                          tf2_ros
+                          tf2_geometry_msgs)
 target_link_libraries(find_frontiers "${cpp_typesupport_target}")
 
 # ExplorationRandom
