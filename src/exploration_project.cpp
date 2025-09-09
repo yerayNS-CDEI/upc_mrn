@@ -45,10 +45,10 @@ ExplorationProject::ExplorationProject() : ExplorationBase("exploration_project"
     get_parameter_or("case", case_, 4);
 
     // Set the maximum distance between goal and frontier in which the robot recomputes a new goal
-    get_parameter_or("param_dist", param_dist_, 0.2);
+    get_parameter_or("param_dist", param_dist_, 2.0);
 
     // Set the time that the distance conditions must be true in which the robot recomputes a new goal
-    get_parameter_or("param_time", param_time_, 1.0);
+    get_parameter_or("param_time", param_time_, 4.0);
     
     //////////////////////////////////////////////////////////////////////
     // TODO 1b END
