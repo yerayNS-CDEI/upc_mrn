@@ -1312,6 +1312,14 @@ private:
     int  fill_holes_every_n_frames_;   // ejecutar cada N mapas (1 = cada mapa)
     int  fill_holes_counter_;          // contador interno
 
+    // Split long frontiers and sharp turns
+    bool   split_long_frontiers_;
+    double max_frontier_segment_m_;
+    bool   split_on_sharp_turns_;
+    double turn_split_deg_;                 // umbral de giro (p.ej. 45°)
+    int    min_segment_cells_after_turn_;   // tamaño mínimo tras cortar por codo
+    int    turn_window_k_;                  // window half-size in cells to compute heading change
+
 public:
     FindFrontiers();
 
@@ -1342,7 +1350,6 @@ private:
     void carveFreeWithRays(nav_msgs::msg::OccupancyGrid &g, double rx, double ry, double r) const;
     void bridgeSmallUnknownGaps(nav_msgs::msg::OccupancyGrid &g, int max_gap, bool do_rows, bool do_cols) const;
     void fillSmallEnclosedUnknownHoles(nav_msgs::msg::OccupancyGrid &g, int max_area_cells, int pad_cells) const;
-
 };
 
 FindFrontiers::FindFrontiers() : Node("find_frontiers"), cell_size_(-1),
@@ -1369,6 +1376,13 @@ FindFrontiers::FindFrontiers() : Node("find_frontiers"), cell_size_(-1),
     get_parameter_or("fill_holes_pad_cells",         fill_holes_pad_cells_,         0);
     get_parameter_or("fill_holes_every_n_frames",    fill_holes_every_n_frames_,    1);
     fill_holes_counter_ = 0;
+
+    get_parameter_or("split_long_frontiers",   split_long_frontiers_,   true);
+    get_parameter_or("max_frontier_segment_m", max_frontier_segment_m_, 2.0); // p.ej. 2 m
+    get_parameter_or("split_on_sharp_turns",          split_on_sharp_turns_,          false);
+    get_parameter_or("turn_split_deg",                turn_split_deg_,                45.0);
+    get_parameter_or("min_segment_cells_after_turn",  min_segment_cells_after_turn_,  std::max(10, min_frontier_size_));
+    get_parameter_or("turn_window_k",                 turn_window_k_,                 3);
 
     // publisher and subscribers
     frontiers_pub_ = this->create_publisher<upc_mrn::msg::Frontiers>("/frontiers", 1);
@@ -1413,17 +1427,22 @@ void FindFrontiers::mapCallback(const nav_msgs::msg::OccupancyGrid &msg)
     std::map<int, int> labels_free_sizes;
     std::vector<int> labels_free = twoPassLabeling(map_free, labels_free_sizes, false);
     // Classify as unknown all free groups except for the biggest one
-    int remaining_label = std::max_element(labels_free_sizes.begin(),
-                                           labels_free_sizes.end(),
-                                           [](const std::pair<int, int> &p1, const std::pair<int, int> &p2)
-                                           { return p1.second < p2.second; })
-                              ->first;
-    for (unsigned int i = 0; i < map_occupancy.data.size(); ++i)
-    {
-        if (map_occupancy.data[i] == 0 and labels_free[i] != remaining_label)
+    int remaining_label = -1;
+    if (!labels_free_sizes.empty()) {
+        remaining_label = std::max_element(labels_free_sizes.begin(),
+                                        labels_free_sizes.end(),
+                                        [](const std::pair<int, int> &p1, const std::pair<int, int> &p2)
+                                        { return p1.second < p2.second; })
+                            ->first;
+    }
+    if (remaining_label != -1) {
+        for (unsigned int i = 0; i < map_occupancy.data.size(); ++i)
         {
-            map_occupancy.data[i] = -1;
-            map_free.data[i] = 0;
+            if (map_occupancy.data[i] == 0 && labels_free[i] != remaining_label)
+            {
+                map_occupancy.data[i] = -1;
+                map_free.data[i] = 0;
+            }
         }
     }
     // publish map_free
@@ -1549,43 +1568,131 @@ void FindFrontiers::mapCallback(const nav_msgs::msg::OccupancyGrid &msg)
         }
     }
 
-    // Compute center cell
-    for (unsigned int i = 0; i < frontiers_msg.frontiers.size(); ++i)
+    // --- Split de fronteras por "codos" (giros bruscos) y, opcionalmente, por longitud ---
     {
-        int label = frontiers_labels[i];
+        std::vector<upc_mrn::msg::Frontier> new_frontiers;
+        new_frontiers.reserve(frontiers_msg.frontiers.size());
 
-        // order the frontier cells
-        std::deque<int> ordered_cells(0);
-        ordered_cells.push_back(frontiers_msg.frontiers[i].cells.front());
-        while (ordered_cells.size() < frontiers_msg.frontiers[i].size)
-        {
-            auto initial_size = ordered_cells.size();
+        // target segment length in cells if also splitting by length
+        const int seg_len_cells = (split_long_frontiers_ && max_frontier_segment_m_ > 0.0)
+            ? std::max(min_frontier_size_, (int)std::round(max_frontier_segment_m_ / map_frontiers.info.resolution))
+            : std::numeric_limits<int>::max();
 
-            // connect cells to first cell
-            std::vector<int> frontAdjacentPoints = getAdjacentPoints(ordered_cells.front(), map_frontiers);
-            for (unsigned int k = 0; k < frontAdjacentPoints.size(); k++)
-                if (frontAdjacentPoints[k] != -1 && labels[frontAdjacentPoints[k]] == label && std::find(ordered_cells.begin(), ordered_cells.end(), frontAdjacentPoints[k]) == ordered_cells.end())
-                {
-                    ordered_cells.push_front(frontAdjacentPoints[k]);
-                    break;
+        const double EPS = 1e-9;
+        const double turn_thresh_rad = turn_split_deg_ * M_PI / 180.0;
+
+        auto angle_dir = [&](const geometry_msgs::msg::Point& a,
+                             const geometry_msgs::msg::Point& b) -> double {
+            return std::atan2(b.y - a.y, b.x - a.x);
+        };
+        auto angle_wrap_diff = [&](double a, double b) -> double {
+            double d = a - b;
+            while (d >  M_PI) d -= 2.0 * M_PI;
+            while (d < -M_PI) d += 2.0 * M_PI;
+            return std::fabs(d);
+        };
+
+        for (unsigned int i = 0; i < frontiers_msg.frontiers.size(); ++i) {
+            int label = (i < (unsigned)frontiers_labels.size()) ? frontiers_labels[i] : 0;
+
+            // ordenar la cadena de celdas de esta frontera (igual que antes)
+            std::deque<int> ordered_cells;
+            if (!frontiers_msg.frontiers[i].cells.empty())
+                ordered_cells.push_back(frontiers_msg.frontiers[i].cells.front());
+
+            while (ordered_cells.size() < frontiers_msg.frontiers[i].size) {
+                auto initial_size = ordered_cells.size();
+
+                std::vector<int> frontAdjacentPoints = getAdjacentPoints(ordered_cells.front(), map_frontiers);
+                for (unsigned int k = 0; k < frontAdjacentPoints.size(); k++) {
+                    int cand = frontAdjacentPoints[k];
+                    if (cand != -1 && labels[cand] == label &&
+                        std::find(ordered_cells.begin(), ordered_cells.end(), cand) == ordered_cells.end()) {
+                        ordered_cells.push_front(cand);
+                        break;
+                    }
                 }
 
-            // connect cells to last cell
-            std::vector<int> backAdjacentPoints = getAdjacentPoints(ordered_cells.back(), map_frontiers);
-            for (unsigned int k = 0; k < backAdjacentPoints.size(); k++)
-                if (backAdjacentPoints[k] != -1 && labels[backAdjacentPoints[k]] == label && std::find(ordered_cells.begin(), ordered_cells.end(), backAdjacentPoints[k]) == ordered_cells.end())
-                {
-                    ordered_cells.push_back(backAdjacentPoints[k]);
-                    break;
+                std::vector<int> backAdjacentPoints = getAdjacentPoints(ordered_cells.back(), map_frontiers);
+                for (unsigned int k = 0; k < backAdjacentPoints.size(); k++) {
+                    int cand = backAdjacentPoints[k];
+                    if (cand != -1 && labels[cand] == label &&
+                        std::find(ordered_cells.begin(), ordered_cells.end(), cand) == ordered_cells.end()) {
+                        ordered_cells.push_back(cand);
+                        break;
+                    }
                 }
 
-            if (initial_size == ordered_cells.size() && ordered_cells.size() < frontiers_msg.frontiers[i].size)
-                break;
+                if (initial_size == ordered_cells.size() && ordered_cells.size() < frontiers_msg.frontiers[i].size)
+                    break;
+            }
+
+            if (ordered_cells.empty()) continue;
+
+            // vector plano de celdas y puntos
+            std::vector<int> chain(ordered_cells.begin(), ordered_cells.end());
+            std::vector<geometry_msgs::msg::Point> pts; pts.reserve(chain.size());
+            for (int cell : chain) pts.push_back(cell2point(cell, map_frontiers));
+
+            // cortes por codos con ventana (k - turn_window_k_ , k + turn_window_k_)
+            std::vector<size_t> cuts; cuts.reserve(chain.size()+2);
+            cuts.push_back(0);
+            if (split_on_sharp_turns_) {
+                const int n = std::max(1, turn_window_k_);
+                if (pts.size() >= (size_t)(2*n + 1)) {
+                    for (size_t k = (size_t)n; k + (size_t)n < pts.size(); ++k) {
+                        const geometry_msgs::msg::Point& A = pts[k - n];
+                        const geometry_msgs::msg::Point& B = pts[k];
+                        const geometry_msgs::msg::Point& C = pts[k + n];
+
+                        double len1 = std::hypot(B.x - A.x, B.y - A.y);
+                        double len2 = std::hypot(C.x - B.x, C.y - B.y);
+                        if (len1 < EPS || len2 < EPS) continue;
+
+                        double ang1 = angle_dir(A, B);
+                        double ang2 = angle_dir(B, C);
+                        double dtheta = angle_wrap_diff(ang2, ang1); // heading change between long segments
+
+                        if (dtheta >= turn_thresh_rad) {
+                            cuts.push_back(k); // corta en el vértice del codo
+                        }
+                    }
+                }
+            }
+            cuts.push_back(chain.size());
+
+            // construir segmentos entre cortes (y opcionalmente también dividir por longitud)
+            for (size_t ci = 0; ci + 1 < cuts.size(); ++ci) {
+                size_t s = cuts[ci];
+                size_t e = cuts[ci+1];
+
+                for (size_t start = s; start < e; ) {
+                    size_t end = std::min(e, start + (size_t)seg_len_cells);
+                    int seg_cells = (int)(end - start);
+
+                    if (seg_cells >= std::max(min_segment_cells_after_turn_, min_frontier_size_)) {
+                        upc_mrn::msg::Frontier seg;
+                        seg.size = seg_cells;
+                        seg.cells.reserve(seg_cells);
+                        seg.cells_points.reserve(seg_cells);
+                        for (size_t k = start; k < end; ++k) {
+                            seg.cells.push_back(chain[k]);
+                            seg.cells_points.push_back(pts[k]);
+                        }
+                        // centro del segmento
+                        seg.center_cell  = seg.cells[seg.size / 2];
+                        seg.center_point = seg.cells_points[seg.size / 2];
+                        new_frontiers.push_back(std::move(seg));
+                    }
+                    if (seg_len_cells == std::numeric_limits<int>::max()) break; // no length split
+                    start = end;
+                }
+            }
         }
-        // center cell
-        frontiers_msg.frontiers[i].center_cell = ordered_cells[ordered_cells.size() / 2];
-        frontiers_msg.frontiers[i].center_point = cell2point(frontiers_msg.frontiers[i].center_cell, map_frontiers);
+
+        frontiers_msg.frontiers.swap(new_frontiers);
     }
+
 
     // Publish
     frontiers_pub_->publish(frontiers_msg);
@@ -1612,8 +1719,8 @@ bool FindFrontiers::isFrontier(const int &cell, const nav_msgs::msg::OccupancyGr
 std::vector<int> FindFrontiers::twoPassLabeling(const nav_msgs::msg::OccupancyGrid &map_labelr, std::map<int, int> &labels_sizes, bool diagonal) const
 {
     labels_sizes.clear();
-    std::vector<int> labels(map_labelr.data.size());
-    labels.assign(map_labelr.data.begin(), map_labelr.data.end());
+    std::vector<int> labels(map_labelr.data.size(), 0);
+    // labels.assign(map_labelr.data.begin(), map_labelr.data.end());
 
     std::vector<int> neigh_labels;
 
@@ -1675,6 +1782,7 @@ std::vector<int> FindFrontiers::twoPassLabeling(const nav_msgs::msg::OccupancyGr
 void FindFrontiers::publishMarkers(const upc_mrn::msg::Frontiers &frontiers_msg)
 {
     // resize
+    markers_.markers.clear();
     markers_.markers.resize(frontiers_msg.frontiers.size() * 3 + 1); // each frontier: cells, center_point and text
 
     // deleteall
