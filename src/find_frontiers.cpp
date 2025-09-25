@@ -1320,6 +1320,11 @@ private:
     int    min_segment_cells_after_turn_;   // tamaño mínimo tras cortar por codo
     int    turn_window_k_;                  // window half-size in cells to compute heading change
 
+    // PRUNE after split (only when few segments remain)
+    bool   prune_after_split_;
+    int    prune_few_threshold_;
+    int    prune_bfs_limit_;
+
 public:
     FindFrontiers();
 
@@ -1357,32 +1362,40 @@ FindFrontiers::FindFrontiers() : Node("find_frontiers"), cell_size_(-1),
                                  tf_listener_(std::make_unique<tf2_ros::TransformListener>(tf_buffer_))
 {
     // Declare & load parameter with default values
-    get_parameter_or("min_frontier_size", min_frontier_size_, 20); // default 5 cells
+    get_parameter_or("min_frontier_size", min_frontier_size_, 10); // default 5 cells
     get_parameter_or("map_frame_id",   map_frame_id_,   std::string("map"));
     get_parameter_or("robot_frame_id", robot_frame_id_, std::string("sick_6"));   // base_link
-    get_parameter_or("blind_radius",   blind_radius_,   0.00); // en metros: AJUSTA a tu LiDAR (range mínimo proyectado)
+    get_parameter_or("blind_radius",   blind_radius_,   2.00); // en metros: AJUSTA a tu LiDAR (range mínimo proyectado)
     get_parameter_or("group_rings", group_rings_, true);
     get_parameter_or("ring_bin_m",  ring_bin_m_,  1.5 * this->declare_parameter("resolution_fallback", 0.05));
-    get_parameter_or("free_dilate_iters", free_dilate_iters_, 1);
+    get_parameter_or("free_dilate_iters", free_dilate_iters_, 2);
 
+    // Gap-bridging
     get_parameter_or("bridge_max_gap_cells",  bridge_max_gap_cells_, 2);
     get_parameter_or("bridge_rows",           bridge_rows_,          true);
     get_parameter_or("bridge_cols",           bridge_cols_,          true);
     get_parameter_or("bridge_every_n_frames", bridge_every_n_frames_, 1);
     frame_count_ = 0;
 
-    get_parameter_or("fill_holes_enable",            fill_holes_enable_,            true);
+    // Hole filling (column interiors)
+    get_parameter_or("fill_holes_enable",            fill_holes_enable_,            false);
     get_parameter_or("fill_holes_max_area_cells",    fill_holes_max_area_cells_,    300);
     get_parameter_or("fill_holes_pad_cells",         fill_holes_pad_cells_,         0);
     get_parameter_or("fill_holes_every_n_frames",    fill_holes_every_n_frames_,    1);
     fill_holes_counter_ = 0;
 
+    // Split long frontiers and sharp turns
     get_parameter_or("split_long_frontiers",   split_long_frontiers_,   true);
-    get_parameter_or("max_frontier_segment_m", max_frontier_segment_m_, 2.0); // p.ej. 2 m
+    get_parameter_or("max_frontier_segment_m", max_frontier_segment_m_, 3.5); // p.ej. 2 m
     get_parameter_or("split_on_sharp_turns",          split_on_sharp_turns_,          false);
     get_parameter_or("turn_split_deg",                turn_split_deg_,                45.0);
     get_parameter_or("min_segment_cells_after_turn",  min_segment_cells_after_turn_,  std::max(10, min_frontier_size_));
     get_parameter_or("turn_window_k",                 turn_window_k_,                 3);
+
+    // PRUNE after split (only when few segments remain)
+    get_parameter_or("prune_after_split",    prune_after_split_,    true);
+    get_parameter_or("prune_few_threshold",  prune_few_threshold_,  4);
+    get_parameter_or("prune_bfs_limit",      prune_bfs_limit_,      2000); // cota de nodos en el BFS
 
     // publisher and subscribers
     frontiers_pub_ = this->create_publisher<upc_mrn::msg::Frontiers>("/frontiers", 1);
@@ -1453,12 +1466,16 @@ void FindFrontiers::mapCallback(const nav_msgs::msg::OccupancyGrid &msg)
     map_filtered_pub_->publish(map_occupancy);
     RCLCPP_DEBUG(this->get_logger(), "map filtered published!");
 
-    try {
-        geometry_msgs::msg::TransformStamped tf = tf_buffer_.lookupTransform(
-            map_frame_id_, robot_frame_id_, tf2::TimePointZero, tf2::durationFromSec(0.05));
+    bool have_pose = false;
+    double rx = 0.0, ry = 0.0;
+    geometry_msgs::msg::TransformStamped tf;
 
-        const double rx = tf.transform.translation.x;
-        const double ry = tf.transform.translation.y;
+    try {
+        tf = tf_buffer_.lookupTransform(map_frame_id_, robot_frame_id_,
+                                        tf2::TimePointZero, tf2::durationFromSec(0.05));
+        rx = tf.transform.translation.x;
+        ry = tf.transform.translation.y;
+        have_pose = true;
 
         // Ray carving: libera solo hasta impacto con obstáculo
         this->carveFreeWithRays(map_working, rx, ry, blind_radius_);
@@ -1480,12 +1497,122 @@ void FindFrontiers::mapCallback(const nav_msgs::msg::OccupancyGrid &msg)
         fillSmallEnclosedUnknownHoles(map_working, fill_holes_max_area_cells_, fill_holes_pad_cells_);
     }
 
-    // FIND FRONTIERS
-    // create map frontiers (assign each cell if it is frontier)
+    const int W = (int)map_working.info.width;
+    const int H = (int)map_working.info.height;
+    auto inb = [&](int x,int y){ return x>=0 && x<W && y>=0 && y<H; };
+    auto at  = [&](int x,int y){ return y*W + x; };
+
+    // --- Reachable free desde el robot sobre map_working ---
+    std::vector<uint8_t> reachable(map_working.data.size(), 0);
+
+    // robot cell
+    int rx_cell = -1, ry_cell = -1;
+    if (have_pose) {
+        rx_cell = (int)std::floor((rx - map_working.info.origin.position.x) / map_working.info.resolution);
+        ry_cell = (int)std::floor((ry - map_working.info.origin.position.y) / map_working.info.resolution);
+    }
+
+    // busca una celda libre cercana si la del robot no es 0 (pequeño radio 1..2)
+    int start_id = -1;
+    for (int rad=0; rad<=2 && start_id==-1; ++rad){
+        for (int dy=-rad; dy<=rad; ++dy){
+            for (int dx=-rad; dx<=rad; ++dx){
+                int x=rx_cell+dx, y=ry_cell+dy;
+                if (!inb(x,y)) continue;
+                int id=at(x,y);
+                if (map_working.data[id]==0){ start_id=id; break; }
+            }
+            if (start_id!=-1) break;
+        }
+    }
+    if (start_id != -1) {
+        std::deque<int> q; 
+        q.push_back(start_id); 
+        reachable[start_id] = 1;
+
+        const int dx4[4] = {1,-1,0,0}, dy4[4] = {0,0,1,-1};
+        while (!q.empty()) {
+            int id = q.front(); q.pop_front();
+            int x = id % W, y = id / W;
+            for (int k = 0; k < 4; ++k) {
+                int nx = x + dx4[k], ny = y + dy4[k]; 
+                if (!inb(nx,ny)) continue;
+                int nid = at(nx,ny);
+                if (map_working.data[nid] == 0 && !reachable[nid]) {
+                    reachable[nid] = 1; 
+                    q.push_back(nid);
+                }
+            }
+        }
+    }
+
+    // --- Etiquetado de UNKNOWN y clasificación abierto/cerrado ---
+    nav_msgs::msg::OccupancyGrid map_unknown = map_working;
+    for (auto &v : map_unknown.data) v = (v == -1) ? 100 : 0;
+
+    std::map<int,int> unk_sizes;
+    std::vector<int> unk_labels = twoPassLabeling(map_unknown, unk_sizes, /*diagonal=*/false);
+    std::unordered_map<int, bool> unknown_is_open;
+    unknown_is_open.reserve(unk_sizes.size());
+
+    // Conjunto de componentes UNKNOWN "abiertos"
+    for (int i = 0; i < (int)map_working.data.size(); ++i) {
+        if (map_working.data[i] != -1) continue;
+        int lbl = unk_labels[i]; if (lbl == 0) continue;
+
+        int x = i % W, y = i / W;
+        // toca borde -> abierto
+        if (x==0 || y==0 || x==W-1 || y==H-1) { unknown_is_open[lbl] = true; continue; }
+
+        // si ya marcado abierto, sigue
+        if (unknown_is_open[lbl]) continue;
+
+        // ¿contorno con libre conectado al cluster libre principal?
+        bool boundary_has_reachable_free = false;
+        const int dx4[4] = {1,-1,0,0}, dy4[4] = {0,0,1,-1};
+        for (int k = 0; k < 4 && !boundary_has_reachable_free; ++k) {
+            int nx = x + dx4[k], ny = y + dy4[k]; 
+            if (!inb(nx,ny)) continue;
+            int nid = at(nx,ny);
+            if (map_working.data[nid] == 0 && reachable[nid]) {
+                boundary_has_reachable_free = true;
+            }
+        }
+        if (boundary_has_reachable_free) unknown_is_open[lbl] = true;
+
+    }
+
+    // // FIND FRONTIERS
+    // // create map frontiers (assign each cell if it is frontier)
+    // for (unsigned int i = 0; i < map_frontiers.data.size(); ++i)
+    // {
+    //     if (isFrontier(i, map_working))
+    //         map_frontiers.data[i] = 100;
+    // }
+
+    // FIND FRONTIERS (solo si toca UNKNOWN "abierto")
     for (unsigned int i = 0; i < map_frontiers.data.size(); ++i)
     {
-        if (isFrontier(i, map_working))
-            map_frontiers.data[i] = 100;
+        if (!isFrontier(i, map_working)) continue;
+
+        // Verifica que al menos un vecino UNKNOWN pertenezca a un comp. abierto
+        int W_ = (int)map_frontiers.info.width;
+        int x = i % W_, y = i / W_;
+        bool touches_open_unknown = false;
+        // 4-conexión hacia UNKNOWN (suficiente y más estricta)
+        const int dx4[4] = {1,-1,0,0}, dy4[4] = {0,0,1,-1};
+        for (int k=0;k<4 && !touches_open_unknown;++k){
+            int nx = x + dx4[k], ny = y + dy4[k];
+            if (nx<0 || ny<0 || nx>=W_ || ny>=(int)map_frontiers.info.height) continue;
+            int nid = ny*W_ + nx;
+            if (map_working.data[nid] == -1) {
+                int ul = unk_labels[nid];
+                if (ul != 0 && unknown_is_open.count(ul) && unknown_is_open[ul]) {
+                    touches_open_unknown = true;
+                }
+            }
+        }
+        if (touches_open_unknown) map_frontiers.data[i] = 100;
     }
 
     // publish map_working
@@ -1517,6 +1644,16 @@ void FindFrontiers::mapCallback(const nav_msgs::msg::OccupancyGrid &msg)
             "[frontiers] %s: n=%zu, min=%d, p50=%d, p90=%d, max=%d, mean=%.1f (min_frontier_size=%d)",
             tag, s.size(), mn, p50, p90, mx, mean, min_frontier_size_);
     };
+
+    int f=0,o=0,u=0;
+    for (auto v: map_working.data) { if(v==0)++f; else if(v==100)++o; else ++u; }
+    RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 2000,
+    "[working] free=%d occ=%d unk=%d", f,o,u);
+
+    int open_cnt=0, closed_cnt=0;
+    for (auto &kv: unknown_is_open) (kv.second?open_cnt:closed_cnt)++;
+    RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 2000,
+        "[unknown] open=%d closed=%d", open_cnt, closed_cnt);
 
     std::vector<int> all_sizes;    all_sizes.reserve(labels_sizes.size());
     std::vector<int> kept_sizes;   kept_sizes.reserve(labels_sizes.size());
@@ -1580,6 +1717,11 @@ void FindFrontiers::mapCallback(const nav_msgs::msg::OccupancyGrid &msg)
 
         const double EPS = 1e-9;
         const double turn_thresh_rad = turn_split_deg_ * M_PI / 180.0;
+
+        const int min_cells_threshold =
+            split_on_sharp_turns_
+                ? std::max(min_segment_cells_after_turn_, min_frontier_size_)
+                : min_frontier_size_;
 
         auto angle_dir = [&](const geometry_msgs::msg::Point& a,
                              const geometry_msgs::msg::Point& b) -> double {
@@ -1670,7 +1812,7 @@ void FindFrontiers::mapCallback(const nav_msgs::msg::OccupancyGrid &msg)
                     size_t end = std::min(e, start + (size_t)seg_len_cells);
                     int seg_cells = (int)(end - start);
 
-                    if (seg_cells >= std::max(min_segment_cells_after_turn_, min_frontier_size_)) {
+                    if (seg_cells >= min_cells_threshold) {
                         upc_mrn::msg::Frontier seg;
                         seg.size = seg_cells;
                         seg.cells.reserve(seg_cells);
@@ -1693,6 +1835,66 @@ void FindFrontiers::mapCallback(const nav_msgs::msg::OccupancyGrid &msg)
         frontiers_msg.frontiers.swap(new_frontiers);
     }
 
+    // --- PRUNE: eliminar segmentos pegados a huecos cerrados (tras split) ---
+    if (prune_after_split_ && (int)frontiers_msg.frontiers.size() <= prune_few_threshold_) {
+
+        auto is_hollow_unknown = [&](int sx, int sy)->bool {
+            // BFS sobre UNKNOWN empezando en (sx,sy), comprobando si su contorno
+            // tiene libres (0) o solo obstáculos (100). Si solo obstáculos → hueco cerrado.
+            std::deque<int> q;
+            std::vector<uint8_t> vis(W*H, 0);
+
+            int sid = at(sx,sy);
+            if (!inb(sx,sy) || map_working.data[sid] != -1) return false;
+
+            q.push_back(sid); vis[sid]=1;
+            bool boundary_has_free=false, boundary_has_obst=false;
+            int explored=0;
+
+            const int dx4[4]={1,-1,0,0}, dy4[4]={0,0,1,-1};
+            while(!q.empty()){
+                int id=q.front(); q.pop_front();
+                if (++explored > prune_bfs_limit_) break; // cota dura de seguridad
+
+                int x = id % W, y = id / W;
+                for (int k=0;k<4;++k){
+                    int xx=x+dx4[k], yy=y+dy4[k];
+                    if (!inb(xx,yy)) continue;
+                    int nid=at(xx,yy);
+                    int v = map_working.data[nid];
+                    if (v == -1 && !vis[nid]) { vis[nid]=1; q.push_back(nid); }
+                    else if (v == 0)   { boundary_has_free = true; }
+                    else if (v == 100) { boundary_has_obst = true; }
+                }
+                if (boundary_has_free) return false; // no es hueco “cerrado”
+            }
+            return (boundary_has_obst && !boundary_has_free);
+        };
+
+        auto touches_hollow = [&](const upc_mrn::msg::Frontier& F)->bool {
+            // Chequea vecinos 4-conexión hacia UNKNOWN alrededor de c/u de las celdas del segmento
+            const int dx4[4]={1,-1,0,0}, dy4[4]={0,0,1,-1};
+            for (int c : F.cells){
+                int cx = c % W, cy = c / W;
+                for (int k=0;k<4;++k){
+                    int nx=cx+dx4[k], ny=cy+dy4[k];
+                    if (!inb(nx,ny)) continue;
+                    if (map_working.data[at(nx,ny)] == -1 && is_hollow_unknown(nx,ny))
+                        return true;
+                }
+            }
+            return false;
+        };
+
+        std::vector<upc_mrn::msg::Frontier> kept; kept.reserve(frontiers_msg.frontiers.size());
+        for (const auto& seg : frontiers_msg.frontiers) {
+            if (!touches_hollow(seg)) kept.push_back(seg);
+        }
+        frontiers_msg.frontiers.swap(kept);
+
+        RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
+            "[prune] after-split kept=%zu", frontiers_msg.frontiers.size());
+    }
 
     // Publish
     frontiers_pub_->publish(frontiers_msg);
@@ -1704,14 +1906,63 @@ void FindFrontiers::mapCallback(const nav_msgs::msg::OccupancyGrid &msg)
 // Check if a cell is frontier (free close to unknown)
 bool FindFrontiers::isFrontier(const int &cell, const nav_msgs::msg::OccupancyGrid &map) const
 {
-    if (map.data[cell] == 0) // check if it is free
-    {
-        auto straightPoints = getStraightPoints(cell, map);
-        for (unsigned int i = 0; i < straightPoints.size(); ++i)
-            if (straightPoints[i] != -1 && map.data[straightPoints[i]] == -1) // check if any neigbor is unknown
-                return true;
+    // if (map.data[cell] == 0) // check if it is free
+    // {
+    //     // /// NEIGBHOURS IN 4 DIRECTIONS
+    //     // auto straightPoints = getStraightPoints(cell, map);
+    //     // for (unsigned int i = 0; i < straightPoints.size(); ++i)
+    //     //     if (straightPoints[i] != -1 && map.data[straightPoints[i]] == -1) // check if any neigbor is unknown
+    //     //         return true;
+
+    //     // /// NEIGBHOURS IN 8 DIRECTIONS
+    //     // auto neigh = getAdjacentPoints(cell, map);
+    //     // for (int idx : neigh)
+    //     //     if (idx != -1 && map.data[idx] == -1) // any neighbor unknown?
+    //     //         return true;
+    // }
+    // // If it is obstacle or unknown, it can not be frontier
+    // return false;
+
+
+    /// NO CORNER-CUTTING
+    if (map.data[cell] != 0) return false; // solo libres pueden ser frontera
+
+    const int W = (int)map.info.width;
+    const int H = (int)map.info.height;
+    auto at = [&](int x,int y){ return y*W + x; };
+
+    int cx = cell % W, cy = cell / W;
+
+    // 4-neighborhood: si hay UNKNOWN ortogonal, cuenta siempre
+    const int dx4[4] = { 1,-1, 0, 0 };
+    const int dy4[4] = { 0, 0, 1,-1 };
+    for (int k=0;k<4;++k){
+        int nx = cx + dx4[k], ny = cy + dy4[k];
+        if (nx<0||nx>=W||ny<0||ny>=H) continue;
+        int nid = at(nx,ny);
+        if (map.data[nid] == -1) return true;
     }
-    // If it is obstacle or unknown, it can not be frontier
+
+    // 8-neighborhood diagonales: solo si NO hay "esquina bloqueada" por obstáculos
+    const int dx8[4] = { 1, 1,-1,-1 };
+    const int dy8[4] = { 1,-1, 1,-1 };
+    for (int k=0;k<4;++k){
+        int nx = cx + dx8[k], ny = cy + dy8[k];
+        if (nx<0||nx>=W||ny<0||ny>=H) continue;
+        int nid = at(nx,ny);
+        if (map.data[nid] != -1) continue;
+
+        // celdas ortogonales intermedias
+        int ax = cx;       int ay = ny;     // (cx, ny)
+        int bx = nx;       int by = cy;     // (nx, cy)
+
+        bool corner_blocked =
+            (ax>=0 && ax<W && ay>=0 && ay<H && map.data[at(ax,ay)] == 100) ||
+            (bx>=0 && bx<W && by>=0 && by<H && map.data[at(bx,by)] == 100);
+
+        if (!corner_blocked) return true; // diagonal válida (no atraviesa esquina de obstáculo)
+    }
+
     return false;
 }
 

@@ -137,7 +137,7 @@ ExplorationBase::ExplorationBase(const std::string &_name)
     rclcpp::SubscriptionOptions options;
     options.callback_group = callback_group_1_;
     map_sub_ = this->create_subscription<nav_msgs::msg::OccupancyGrid>(
-        "/map", 1, std::bind(&ExplorationBase::mapCallback, this, std::placeholders::_1), options);
+        "/map_working", 1, std::bind(&ExplorationBase::mapCallback, this, std::placeholders::_1), options);
     frontiers_sub_ = this->create_subscription<upc_mrn::msg::Frontiers>(
         "/frontiers", 1, std::bind(&ExplorationBase::frontiersCallback, this, std::placeholders::_1), options);
 
@@ -754,19 +754,25 @@ bool ExplorationBase::updateRobotPose()
 
     // Look up for the transformation between target_frame and turtle2 frames
     // and send velocity commands for turtle2 to reach target_frame
-    std::string source_frame = "map";
-    std::string target_frame = "base_link";
+    // std::string source_frame = "map";
+    // std::string target_frame = "base_link";
+    std::string global_frame, base_frame;
+    this->get_parameter_or("global_frame", global_frame, std::string("map"));
+    this->get_parameter_or("robot_base_frame", base_frame, std::string("base_link"));
+
     try
     {
         t = tf_buffer_->lookupTransform(
-            source_frame, target_frame,
+            // source_frame, target_frame,
+            global_frame, base_frame,
             tf2::TimePointZero);
     }
     catch (const tf2::TransformException &ex)
     {
         RCLCPP_INFO(
             this->get_logger(), "Could not transform %s to %s: %s",
-            target_frame.c_str(), target_frame.c_str(), ex.what());
+            // target_frame.c_str(), target_frame.c_str(), ex.what());
+            base_frame.c_str(), global_frame.c_str(), ex.what());
         return false;
     }
 
