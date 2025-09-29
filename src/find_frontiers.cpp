@@ -1304,6 +1304,9 @@ private:
     bool bridge_cols_;              // run vertical pass
     int  bridge_every_n_frames_;    // run every N frames (1 = every frame)
     int  frame_count_;              // internal counter
+    int  bridge_obst_max_gap_cells_;   // e.g. 2 -> fill up to 2 unknown cells between free cells
+    bool bridge_obst_rows_;
+    bool bridge_obst_cols_;
 
     // Hole filling (column interiors)
     bool fill_holes_enable_;
@@ -1354,6 +1357,10 @@ private:
     void carveRayFree(nav_msgs::msg::OccupancyGrid &g, int x0, int y0, int x1, int y1) const;
     void carveFreeWithRays(nav_msgs::msg::OccupancyGrid &g, double rx, double ry, double r) const;
     void bridgeSmallUnknownGaps(nav_msgs::msg::OccupancyGrid &g, int max_gap, bool do_rows, bool do_cols) const;
+    void bridgeSmallFreeOrUnknownGaps(nav_msgs::msg::OccupancyGrid &g, int max_gap, bool do_rows, bool do_cols) const;
+    void bridgeSmallUnknownGapsGeneric(nav_msgs::msg::OccupancyGrid &g,
+                                   int max_gap, bool do_rows, bool do_cols,
+                                   int endpoint_value, int fill_value) const;
     void fillSmallEnclosedUnknownHoles(nav_msgs::msg::OccupancyGrid &g, int max_area_cells, int pad_cells) const;
 };
 
@@ -1368,14 +1375,17 @@ FindFrontiers::FindFrontiers() : Node("find_frontiers"), cell_size_(-1),
     get_parameter_or("blind_radius",   blind_radius_,   2.00); // en metros: AJUSTA a tu LiDAR (range mínimo proyectado)
     get_parameter_or("group_rings", group_rings_, true);
     get_parameter_or("ring_bin_m",  ring_bin_m_,  1.5 * this->declare_parameter("resolution_fallback", 0.05));
-    get_parameter_or("free_dilate_iters", free_dilate_iters_, 2);
+    get_parameter_or("free_dilate_iters", free_dilate_iters_, 1);
 
     // Gap-bridging
-    get_parameter_or("bridge_max_gap_cells",  bridge_max_gap_cells_, 2);
+    get_parameter_or("bridge_max_gap_cells",  bridge_max_gap_cells_, 5);
     get_parameter_or("bridge_rows",           bridge_rows_,          true);
     get_parameter_or("bridge_cols",           bridge_cols_,          true);
     get_parameter_or("bridge_every_n_frames", bridge_every_n_frames_, 1);
     frame_count_ = 0;
+    get_parameter_or("bridge_obst_max_gap_cells", bridge_obst_max_gap_cells_, 10);  // 0 = desactivado
+    get_parameter_or("bridge_obst_rows",          bridge_obst_rows_,          true);
+    get_parameter_or("bridge_obst_cols",          bridge_obst_cols_,          true);
 
     // Hole filling (column interiors)
     get_parameter_or("fill_holes_enable",            fill_holes_enable_,            false);
@@ -1394,7 +1404,7 @@ FindFrontiers::FindFrontiers() : Node("find_frontiers"), cell_size_(-1),
 
     // PRUNE after split (only when few segments remain)
     get_parameter_or("prune_after_split",    prune_after_split_,    true);
-    get_parameter_or("prune_few_threshold",  prune_few_threshold_,  4);
+    get_parameter_or("prune_few_threshold",  prune_few_threshold_,  5);
     get_parameter_or("prune_bfs_limit",      prune_bfs_limit_,      2000); // cota de nodos en el BFS
 
     // publisher and subscribers
@@ -1490,7 +1500,18 @@ void FindFrontiers::mapCallback(const nav_msgs::msg::OccupancyGrid &msg)
 
     if (bridge_max_gap_cells_ > 0 &&
         (frame_count_++ % std::max(1, bridge_every_n_frames_) == 0)) {
+        // Puentes entre libres
         bridgeSmallUnknownGaps(map_working, bridge_max_gap_cells_, bridge_rows_, bridge_cols_);
+    }
+
+    if (bridge_obst_max_gap_cells_ > 0 &&
+        (frame_count_++ % std::max(1, bridge_every_n_frames_) == 0)) {
+            // Puentes entre obstáculos (rellena -1 con 100 si están entre 100..100)
+            // bridgeSmallUnknownGapsGeneric(map_working,
+            //                             bridge_obst_max_gap_cells_,
+            //                             bridge_obst_rows_, bridge_obst_cols_,
+            //                             /*endpoint_value=*/100, /*fill_value=*/100);
+            bridgeSmallFreeOrUnknownGaps(map_working, bridge_max_gap_cells_, bridge_rows_, bridge_cols_);
     }
 
     if (fill_holes_enable_ && (++fill_holes_counter_ % std::max(1, fill_holes_every_n_frames_)) == 0) {
@@ -2360,7 +2381,143 @@ void FindFrontiers::bridgeSmallUnknownGaps(nav_msgs::msg::OccupancyGrid &g,
             }
         }
     }
+
+    // // Versión original (UNKNOWN entre libres -> se rellena con FREE)
+    // bridgeSmallUnknownGapsGeneric(g, max_gap, do_rows, do_cols, /*endpoint_value=*/0, /*fill_value=*/0);
 }
+
+void FindFrontiers::bridgeSmallFreeOrUnknownGaps(nav_msgs::msg::OccupancyGrid &g,
+                                                 int max_gap, bool do_rows, bool do_cols) const
+{
+    if (max_gap <= 0) return;
+
+    const int W = static_cast<int>(g.info.width);
+    const int H = static_cast<int>(g.info.height);
+    auto at = [&](int x,int y){ return y*W + x; };
+
+    // --- Horizontal pass (rows) ---
+    if (do_rows) {
+        for (int y = 0; y < H; ++y) {
+            int x = 0;
+            while (x < W) {
+                // avanzar hasta OBSTACLE
+                while (x < W && g.data[at(x,y)] != 100) ++x;
+                if (x >= W) break;
+
+                int k = x + 1;
+                // contar FREE o UNKNOWN después del obstáculo
+                while (k < W && (g.data[at(k,y)] == 0 || g.data[at(k,y)] == -1)) ++k;
+                int gap = k - (x + 1);
+
+                // si gap <= max_gap y termina en OBSTACLE
+                if (gap > 0 && gap <= max_gap && k < W && g.data[at(k,y)] == 100) {
+                    for (int t = x + 1; t < k; ++t) {
+                        g.data[at(t,y)] = 100; // rellenar como obstáculo
+                    }
+                    x = k;
+                } else {
+                    x = std::max(k, x + 1);
+                }
+            }
+        }
+    }
+
+    // --- Vertical pass (columns) ---
+    if (do_cols) {
+        for (int x = 0; x < W; ++x) {
+            int y = 0;
+            while (y < H) {
+                while (y < H && g.data[at(x,y)] != 100) ++y;
+                if (y >= H) break;
+
+                int k = y + 1;
+                while (k < H && (g.data[at(x,k)] == 0 || g.data[at(x,k)] == -1)) ++k;
+                int gap = k - (y + 1);
+
+                if (gap > 0 && gap <= max_gap && k < H && g.data[at(x,k)] == 100) {
+                    for (int t = y + 1; t < k; ++t) {
+                        g.data[at(x,t)] = 100;
+                    }
+                    y = k;
+                } else {
+                    y = std::max(k, y + 1);
+                }
+            }
+        }
+    }
+}
+
+void FindFrontiers::bridgeSmallUnknownGapsGeneric(nav_msgs::msg::OccupancyGrid &g,
+                                                  int max_gap, bool do_rows, bool do_cols,
+                                                  int endpoint_value, int fill_value) const
+{
+    // Rellena runs de -1 (UNKNOWN) entre dos celdas endpoint_value (0 o 100)
+    if (max_gap <= 0) return;
+
+    const int W = static_cast<int>(g.info.width);
+    const int H = static_cast<int>(g.info.height);
+    auto at = [&](int x,int y){ return y*W + x; };
+
+    auto try_bridge_row = [&](int y){
+        int x = 0;
+        while (x < W) {
+            // avanza hasta encontrar el primer endpoint
+            while (x < W && g.data[at(x,y)] != endpoint_value) ++x;
+            if (x >= W) return;
+
+            // cuenta UNKNOWN seguidos
+            int k = x + 1;
+            while (k < W && g.data[at(k,y)] == -1) ++k;
+            int gap = k - (x + 1);
+
+            // puente si el siguiente es endpoint y el gap cabe en max_gap
+            if (gap > 0 && gap <= max_gap && k < W && g.data[at(k,y)] == endpoint_value) {
+                for (int t = x + 1; t < k; ++t) {
+                    // nunca pises el “otro” endpoint (ej. no pises libres si estás rellenando obstáculos)
+                    if (fill_value == 0 && g.data[at(t,y)] == 100) continue; // no pisar obstáculos cuando rellenamos libres
+                    if (fill_value == 100) {
+                        g.data[at(t,y)] = 100; // al unificar obstáculos, pisar TODO (libre o desconocido)
+                    } else {
+                        g.data[at(t,y)] = 0;
+                    }
+                }
+                x = k;  // continúa tras el endpoint derecho
+            } else {
+                x = std::max(k, x + 1);
+            }
+        }
+    };
+
+    auto try_bridge_col = [&](int x){
+        int y = 0;
+        while (y < H) {
+            while (y < H && g.data[at(x,y)] != endpoint_value) ++y;
+            if (y >= H) return;
+
+            int k = y + 1;
+            while (k < H && g.data[at(x,k)] == -1) ++k;
+            int gap = k - (y + 1);
+
+            if (gap > 0 && gap <= max_gap && k < H && g.data[at(x,k)] == endpoint_value) {
+                for (int t = y + 1; t < k; ++t) {
+                    if (fill_value == 0 && g.data[at(x,t)] == 100) continue; // no pisar obstáculos cuando rellenamos libres
+                    if (fill_value == 100) {
+                        g.data[at(x,t)] = 100; // al unificar obstáculos, pisar TODO (libre o desconocido)
+                    } else {
+                        g.data[at(x,t)] = 0;
+                    }
+                }
+                y = k;
+            } else {
+                y = std::max(k, y + 1);
+            }
+        }
+    };
+
+    if (do_rows) for (int y = 0; y < H; ++y) try_bridge_row(y);
+    if (do_cols) for (int x = 0; x < W; ++x) try_bridge_col(x);
+}
+
 
 void FindFrontiers::fillSmallEnclosedUnknownHoles(nav_msgs::msg::OccupancyGrid &g,
                                                   int max_area_cells, int pad_cells) const
